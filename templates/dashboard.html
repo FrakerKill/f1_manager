@@ -124,13 +124,110 @@
             </div>
         </div>
 
+        <!-- Actividades en Progreso -->
+        <div class="card mt-3 border-info">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">🔄 Actividades en Progreso</h5>
+            </div>
+            <div class="card-body">
+                <!-- Entrenamientos en Progreso -->
+                {% if active_training %}
+                <div class="activity-item mb-3 p-2 border rounded">
+                    {% set staff_name = "" %}
+                    {% if active_training.staff_type == 'driver' %}
+                        {% set staff = team.drivers|selectattr("id", "equalto", active_training.staff_id)|first %}
+                        {% set staff_name = staff.name if staff else "Piloto" %}
+                    {% elif active_training.staff_type == 'mechanic' %}
+                        {% set staff = team.mechanics|selectattr("id", "equalto", active_training.staff_id)|first %}
+                        {% set staff_name = staff.name if staff else "Mecánico" %}
+                    {% elif active_training.staff_type == 'engineer' %}
+                        {% set staff = team.engineers|selectattr("id", "equalto", active_training.staff_id)|first %}
+                        {% set staff_name = staff.name if staff else "Ingeniero" %}
+                    {% endif %}
+                    
+                    <div class="d-flex justify-content-between align-items-start">
+                        <h6 class="mb-1">
+                            {% if active_training.staff_type == 'driver' %}🏎️
+                            {% elif active_training.staff_type == 'mechanic' %}🔧
+                            {% elif active_training.staff_type == 'engineer' %}📊
+                            {% endif %}
+                            {{ staff_name }}
+                        </h6>
+                        <span class="badge bg-primary">Nv {{ active_training.level }}</span>
+                    </div>
+                    <small class="text-muted">
+                        {{ active_training.attribute|title }} - {{ active_training.weeks }} semana(s)<br>
+                        €{{ "{:,.0f}".format(active_training.total_cost) }}
+                    </small>
+                    <div class="progress mt-1" style="height: 15px;">
+                        {% set progress = active_training.progress %}
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-warning" 
+                             style="width: {{ progress }}%">
+                            {{ progress|round|int }}%
+                        </div>
+                    </div>
+                    <small class="text-muted d-block mt-1">
+                        Finaliza: {{ active_training.end_date.strftime('%d/%m/%Y') }}
+                    </small>
+                    {% if active_training.progress >= 100 %}
+                    <a href="{{ url_for('training') }}" class="btn btn-success btn-sm w-100 mt-1">
+                        ✅ Completar Entrenamiento
+                    </a>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <!-- Mejoras en Progreso -->
+                {% if active_upgrade %}
+                <div class="activity-item mb-3 p-2 border rounded">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <h6 class="mb-1">🔧 Mejora de {{ active_upgrade.component_type|title }}</h6>
+                        <span class="badge bg-primary">Nv {{ active_upgrade.level }}</span>
+                    </div>
+                    <small class="text-muted">
+                        {{ active_upgrade.weeks }} semana(s) - €{{ "{:,.0f}".format(active_upgrade.total_cost) }}
+                    </small>
+                    <div class="progress mt-1" style="height: 15px;">
+                        {% set progress = active_upgrade.progress %}
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                             style="width: {{ progress }}%">
+                            {{ progress|round|int }}%
+                        </div>
+                    </div>
+                    <small class="text-muted d-block mt-1">
+                        Finaliza: {{ active_upgrade.end_date.strftime('%d/%m/%Y') }}
+                    </small>
+                    {% if active_upgrade.progress >= 100 %}
+                    <a href="{{ url_for('upgrades') }}" class="btn btn-success btn-sm w-100 mt-1">
+                        ✅ Completar Mejora
+                    </a>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                {% if not active_upgrade and not active_training %}
+                <div class="text-center text-muted py-3">
+                    <p>No hay actividades en progreso</p>
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('upgrades') }}" class="btn btn-outline-primary btn-sm">
+                            Desarrollar Mejoras
+                        </a>
+                        <a href="{{ url_for('training') }}" class="btn btn-outline-warning btn-sm">
+                            Entrenar Personal
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
         <div class="card mt-3">
             <div class="card-body">
                 <h5 class="card-title">Acciones Rápidas</h5>
                 <div class="d-grid gap-2">
                     <a href="{{ url_for('market') }}" class="btn btn-outline-primary">Mercado de Transferencias</a>
                     <a href="{{ url_for('upgrades') }}" class="btn btn-outline-success">Desarrollar Mejoras</a>
-					<a href="{{ url_for('training') }}" class="btn btn-outline-warning">Entrenar Personal</a>
+                    <a href="{{ url_for('training') }}" class="btn btn-outline-warning">Entrenar Personal</a>
                     <a href="{{ url_for('team_management') }}" class="btn btn-outline-info">Gestionar Equipo</a>
                 </div>
             </div>
@@ -213,6 +310,14 @@ document.addEventListener('DOMContentLoaded', function() {
 .event-actions .btn {
     font-size: 0.8rem;
     padding: 4px 8px;
+}
+
+.activity-item {
+    background: #f8f9fa;
+}
+
+.activity-item h6 {
+    font-size: 0.9rem;
 }
 </style>
 {% endif %}

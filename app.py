@@ -648,6 +648,18 @@ def dashboard():
         'car_components': current_user.car_components
     }
     
+    # Obtener mejora activa
+    active_upgrade = Upgrade.query.filter_by(
+        team_id=current_user.id, 
+        completed=False
+    ).first()
+    
+    # Obtener entrenamiento activo
+    active_training = Training.query.filter_by(
+        team_id=current_user.id, 
+        completed=False
+    ).first()
+    
     # Encontrar el próximo evento
     now = datetime.utcnow()
     next_event = None
@@ -671,7 +683,11 @@ def dashboard():
                         'session_datetime': session_time
                     }
     
-    return render_template('dashboard.html', team=team_info, next_event=next_event)
+    return render_template('dashboard.html', 
+                         team=team_info, 
+                         next_event=next_event,
+                         active_upgrade=active_upgrade,
+                         active_training=active_training)
 
 @app.route('/team')
 @login_required
@@ -1070,6 +1086,41 @@ class TrainingSystem:
             training.completed = True
         
         db.session.commit()
+        
+# Añadir esta clase después de TrainingSystem
+class UpgradeSystem:
+    @staticmethod
+    def complete_upgrades():
+        """Completa las mejoras que han terminado su tiempo"""
+        upgrades = Upgrade.query.filter(
+            Upgrade.end_date <= datetime.utcnow(),
+            Upgrade.completed == False
+        ).all()
+        
+        for upgrade in upgrades:
+            # Aplicar mejora al componente
+            component = CarComponent.query.filter_by(
+                team_id=upgrade.team_id,
+                component_type=upgrade.component_type
+            ).first()
+            
+            if component:
+                # Calcular mejoras basadas en el nivel
+                strength_improvement = upgrade.level * 5  # +5, +10, +15
+                reliability_improvement = upgrade.level * 3  # +3, +6, +9
+                
+                component.strength = min(100, component.strength + strength_improvement)
+                component.reliability = min(100, component.reliability + reliability_improvement)
+            
+            # Marcar como completada
+            upgrade.completed = True
+        
+        db.session.commit()
+
+# Actualizar la tarea programada para mejoras
+def scheduled_upgrade_completion():
+    with app.app_context():
+        UpgradeSystem.complete_upgrades()
 
 # Actualizar la tarea programada
 def scheduled_training_completion():
