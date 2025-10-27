@@ -78,20 +78,6 @@
                         </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label">Neumático de Salida</label>
-                        <select class="form-select" id="startingTyre" required>
-                            <option value="soft">Blando (Soft) - Máxima velocidad en seco</option>
-                            <option value="medium">Medio (Medium) - Equilibrado en seco</option>
-                            <option value="hard">Duro (Hard) - Duradero en seco</option>
-                            <option value="wet">Lluvia (Wet) - Lluvia ligera</option>
-                            <option value="extreme_wet">Lluvia Extrema - Lluvia intensa</option>
-                        </select>
-                        <div class="form-text" id="startingTyreHelp">
-                            Selecciona el neumático según las condiciones meteorológicas
-                        </div>
-                    </div>
-
                     <!-- Estrategias Condicionales -->
                     <div class="card mb-3">
                         <div class="card-header">
@@ -135,18 +121,24 @@
                     </div>
 
                     <div id="strategySegments">
-                        <h6>Segmentos de la Estrategia Base</h6>
+                        <h6>Segmentos de la Estrategia</h6>
+                        <div class="alert alert-info">
+                            <small><strong>💡 Nota:</strong> El primer segmento define el neumático de salida</small>
+                        </div>
                         <div class="segment-item border rounded p-3 mb-3">
                             <div class="row">
                                 <div class="col-md-6">
-                                    <label class="form-label">Neumático</label>
-                                    <select class="form-select segment-tyre" name="segments[0][tyre_type]" required>
-                                        <option value="soft">Blando (Soft)</option>
-                                        <option value="medium">Medio (Medium)</option>
-                                        <option value="hard">Duro (Hard)</option>
-                                        <option value="wet">Lluvia (Wet)</option>
-                                        <option value="extreme_wet">Lluvia Extrema</option>
+                                    <label class="form-label">Neumático de Salida</label>
+                                    <select class="form-select segment-tyre first-segment-tyre" name="segments[0][tyre_type]" required>
+                                        <option value="soft">Blando (Soft) - Máxima velocidad en seco</option>
+                                        <option value="medium">Medio (Medium) - Equilibrado en seco</option>
+                                        <option value="hard">Duro (Hard) - Duradero en seco</option>
+                                        <option value="wet">Lluvia (Wet) - Lluvia ligera</option>
+                                        <option value="extreme_wet">Lluvia Extrema - Lluvia intensa</option>
                                     </select>
+                                    <div class="form-text" id="startingTyreHelp">
+                                        Selecciona el neumático según las condiciones meteorológicas
+                                    </div>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label">Vueltas Planificadas</label>
@@ -230,6 +222,7 @@
                     <strong>{{ strategy.strategy_name }}</strong>
                     <small class="text-muted"> - {{ strategy.driver.name }}</small>
                     <div class="mt-1">
+                        <span class="badge bg-success">Salida: {{ strategy.starting_tyre }}</span>
                         {% for segment in strategy.segments %}
                         <span class="badge bg-{% if segment.tyre_type == 'soft' %}danger{% elif segment.tyre_type == 'medium' %}warning{% elif segment.tyre_type == 'hard' %}secondary{% elif segment.tyre_type == 'wet' %}info{% else %}primary{% endif %}">
                             {{ segment.laps_planned }} {{ segment.tyre_type }}
@@ -238,7 +231,6 @@
                     </div>
                     <div class="mt-1">
                         <small>Paradas: {{ strategy.total_pit_stops }}</small>
-                        <small class="ms-2">Salida: {{ strategy.starting_tyre }}</small>
                         <button class="btn btn-sm btn-outline-danger float-end" onclick="deleteStrategy({{ strategy.id }})">
                             🗑️
                         </button>
@@ -288,13 +280,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const totalLaps = {{ race.circuit.laps }};
     const raceWeather = '{{ race_weather.condition if race_weather else "dry" }}';
 
-    // Actualizar recomendaciones según el neumático de salida
-    document.getElementById('startingTyre').addEventListener('change', function() {
-        updateTyreRecommendations();
+    // Actualizar recomendaciones según el neumático del primer segmento
+    document.addEventListener('change', function(e) {
+        if (e.target.classList.contains('first-segment-tyre')) {
+            updateTyreRecommendations();
+        }
     });
 
     function updateTyreRecommendations() {
-        const startingTyre = document.getElementById('startingTyre').value;
+        const firstSegmentTyre = document.querySelector('.first-segment-tyre').value;
         const helpText = document.getElementById('startingTyreHelp');
         
         const recommendations = {
@@ -305,12 +299,12 @@ document.addEventListener('DOMContentLoaded', function() {
             'extreme_wet': 'Para lluvia intensa. Máximo agarre en condiciones extremas.'
         };
         
-        helpText.textContent = recommendations[startingTyre] || 'Selecciona un neumático apropiado para las condiciones.';
+        helpText.textContent = recommendations[firstSegmentTyre] || 'Selecciona un neumático apropiado para las condiciones.';
         
         // Advertencia si el neumático no coincide con las condiciones
-        if ((raceWeather === 'dry' && ['wet', 'extreme_wet'].includes(startingTyre)) ||
-            (raceWeather === 'light_rain' && ['soft', 'medium', 'hard'].includes(startingTyre)) ||
-            (raceWeather === 'heavy_rain' && startingTyre !== 'extreme_wet')) {
+        if ((raceWeather === 'dry' && ['wet', 'extreme_wet'].includes(firstSegmentTyre)) ||
+            (raceWeather === 'light_rain' && ['soft', 'medium', 'hard'].includes(firstSegmentTyre)) ||
+            (raceWeather === 'heavy_rain' && firstSegmentTyre !== 'extreme_wet')) {
             helpText.className = 'form-text text-danger';
             helpText.textContent += ' ⚠️ Neumático inapropiado para las condiciones pronosticadas.';
         } else {
@@ -396,11 +390,20 @@ document.addEventListener('DOMContentLoaded', function() {
             const tyreName = getTyreName(tyreType);
             const tyreColor = getTyreColor(tyreType);
             
-            summaryHTML += `
-                <span class="badge bg-${tyreColor} me-1 mb-1">
-                    ${laps} ${tyreName}
-                </span>
-            `;
+            // Mostrar el primer segmento como "Salida"
+            if (index === 0) {
+                summaryHTML += `
+                    <span class="badge bg-success me-1 mb-1">
+                        Salida: ${tyreName}
+                    </span>
+                `;
+            } else {
+                summaryHTML += `
+                    <span class="badge bg-${tyreColor} me-1 mb-1">
+                        ${laps} ${tyreName}
+                    </span>
+                `;
+            }
 
             // Verificar si el neumático es apropiado para las condiciones
             if (!isTyreAppropriate(tyreType, raceWeather)) {
@@ -490,7 +493,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const driverId = document.getElementById('driverSelect').value;
         const strategyName = document.getElementById('strategyName').value;
-        const startingTyre = document.getElementById('startingTyre').value;
         const rainStrategy = document.getElementById('rainStrategy').value;
         const heavyRainStrategy = document.getElementById('heavyRainStrategy').value;
         const dryStrategy = document.getElementById('dryStrategy').value;
@@ -512,6 +514,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 segment_order: index + 1
             });
         });
+
+        // El neumático de salida es el del primer segmento
+        const startingTyre = segments[0].tyre_type;
 
         // Verificar que la suma de vueltas sea correcta
         const totalPlannedLaps = segments.reduce((sum, segment) => sum + segment.laps_planned, 0);
@@ -583,6 +588,9 @@ function deleteStrategy(strategyId) {
     margin-top: 10px;
     margin-bottom: 5px;
     font-size: 0.9em;
+}
+.first-segment-tyre {
+    font-weight: bold;
 }
 </style>
 {% endblock %}

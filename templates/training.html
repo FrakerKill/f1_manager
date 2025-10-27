@@ -89,14 +89,11 @@
                         </div>
                         
                         {% if not active_training %}
-                        <form class="training-form">
-                            <input type="hidden" name="staff_type" value="driver">
-                            <input type="hidden" name="staff_id" value="{{ driver.id }}">
-                            
+                        <div class="training-form" data-staff-type="driver" data-staff-id="{{ driver.id }}">
                             <div class="row">
                                 <div class="col-md-4">
                                     <label class="form-label"><small><strong>Atributo a Mejorar:</strong></small></label>
-                                    <select name="attribute" class="form-select form-select-sm">
+                                    <select name="attribute" class="form-select form-select-sm attribute-select">
                                         <option value="skill">Habilidad</option>
                                         <option value="experience">Experiencia</option>
                                         <option value="aggression">Agresividad</option>
@@ -106,17 +103,17 @@
                                 <div class="col-md-4">
                                     <label class="form-label"><small><strong>Nivel:</strong></small></label>
                                     <select name="level" class="form-select form-select-sm level-select">
-                                        <option value="1" data-cost="200000">Nivel 1 (+3)</option>
-                                        <option value="2" data-cost="400000">Nivel 2 (+6)</option>
-                                        <option value="3" data-cost="600000">Nivel 3 (+9)</option>
+                                        <option value="1" data-cost="500000">Nivel 1 (+3)</option>
+                                        <option value="2" data-cost="1000000">Nivel 2 (+6)</option>
+                                        <option value="3" data-cost="1500000">Nivel 3 (+9)</option>
                                     </select>
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label"><small><strong>Duración:</strong></small></label>
                                     <select name="weeks" class="form-select form-select-sm weeks-select">
-                                        <option value="1" data-cost="200000">1 semana</option>
-                                        <option value="2" data-cost="400000">2 semanas</option>
-                                        <option value="3" data-cost="600000">3 semanas</option>
+                                        <option value="1" data-multiplier="1">1 semana</option>
+                                        <option value="2" data-multiplier="2">2 semanas</option>
+                                        <option value="3" data-multiplier="3">3 semanas</option>
                                     </select>
                                 </div>
                             </div>
@@ -125,15 +122,15 @@
                                 <div class="d-flex justify-content-between align-items-center">
                                     <strong>Costo Total:</strong>
                                     <span id="total_cost_driver_{{ driver.id }}" class="badge bg-success fs-6">
-                                        €400,000
+                                        €500,000
                                     </span>
                                 </div>
                             </div>
                             
-                            <button type="submit" class="btn btn-success btn-sm w-100 mt-2">
+                            <button type="button" class="btn btn-success btn-sm w-100 mt-2 start-training-btn">
                                 Iniciar Entrenamiento
                             </button>
-                        </form>
+                        </div>
                         {% else %}
                         <div class="text-center text-muted py-2">
                             <small>Otro entrenamiento en progreso</small>
@@ -168,14 +165,11 @@
                         </div>
                         
                         {% if not active_training %}
-                        <form class="training-form">
-                            <input type="hidden" name="staff_type" value="mechanic">
-                            <input type="hidden" name="staff_id" value="{{ mechanic.id }}">
-                            
+                        <div class="training-form" data-staff-type="mechanic" data-staff-id="{{ mechanic.id }}">
                             <div class="row">
                                 <div class="col-md-4">
                                     <label class="form-label"><small><strong>Atributo a Mejorar:</strong></small></label>
-                                    <select name="attribute" class="form-select form-select-sm">
+                                    <select name="attribute" class="form-select form-select-sm attribute-select">
                                         <option value="pit_stop_skill">Habilidad en Boxes</option>
                                         <option value="reliability_skill">Fiabilidad</option>
                                     </select>
@@ -183,17 +177,17 @@
                                 <div class="col-md-4">
                                     <label class="form-label"><small><strong>Nivel:</strong></small></label>
                                     <select name="level" class="form-select form-select-sm level-select">
-                                        <option value="1" data-cost="200000">Nivel 1 (+3)</option>
-                                        <option value="2" data-cost="400000">Nivel 2 (+6)</option>
-                                        <option value="3" data-cost="600000">Nivel 3 (+9)</option>
+                                        <option value="1" data-cost="50000">Nivel 1 (+3)</option>
+                                        <option value="2" data-cost="100000">Nivel 2 (+6)</option>
+                                        <option value="3" data-cost="150000">Nivel 3 (+9)</option>
                                     </select>
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label"><small><strong>Duración:</strong></small></label>
                                     <select name="weeks" class="form-select form-select-sm weeks-select">
-                                        <option value="1" data-cost="200000">1 semana</option>
-                                        <option value="2" data-cost="400000">2 semanas</option>
-                                        <option value="3" data-cost="600000">3 semanas</option>
+                                        <option value="1" data-multiplier="1">1 semana</option>
+                                        <option value="2" data-multiplier="2">2 semanas</option>
+                                        <option value="3" data-multiplier="3">3 semanas</option>
                                     </select>
                                 </div>
                             </div>
@@ -202,15 +196,15 @@
                                 <div class="d-flex justify-content-between align-items-center">
                                     <strong>Costo Total:</strong>
                                     <span id="total_cost_mechanic_{{ mechanic.id }}" class="badge bg-success fs-6">
-                                        €400,000
+                                        €50,000
                                     </span>
                                 </div>
                             </div>
                             
-                            <button type="submit" class="btn btn-success btn-sm w-100 mt-2">
+                            <button type="button" class="btn btn-success btn-sm w-100 mt-2 start-training-btn">
                                 Iniciar Entrenamiento
                             </button>
-                        </form>
+                        </div>
                         {% else %}
                         <div class="text-center text-muted py-2">
                             <small>Otro entrenamiento en progreso</small>
@@ -245,14 +239,11 @@
                         </div>
                         
                         {% if not active_training %}
-                        <form class="training-form">
-                            <input type="hidden" name="staff_type" value="engineer">
-                            <input type="hidden" name="staff_id" value="{{ engineer.id }}">
-                            
+                        <div class="training-form" data-staff-type="engineer" data-staff-id="{{ engineer.id }}">
                             <div class="row">
                                 <div class="col-md-4">
                                     <label class="form-label"><small><strong>Atributo a Mejorar:</strong></small></label>
-                                    <select name="attribute" class="form-select form-select-sm">
+                                    <select name="attribute" class="form-select form-select-sm attribute-select">
                                         <option value="innovation">Innovación</option>
                                         <option value="development_speed">Velocidad Desarrollo</option>
                                     </select>
@@ -260,17 +251,17 @@
                                 <div class="col-md-4">
                                     <label class="form-label"><small><strong>Nivel:</strong></small></label>
                                     <select name="level" class="form-select form-select-sm level-select">
-                                        <option value="1" data-cost="200000">Nivel 1 (+3)</option>
-                                        <option value="2" data-cost="400000">Nivel 2 (+6)</option>
-                                        <option value="3" data-cost="600000">Nivel 3 (+9)</option>
+                                        <option value="1" data-cost="50000">Nivel 1 (+3)</option>
+                                        <option value="2" data-cost="100000">Nivel 2 (+6)</option>
+                                        <option value="3" data-cost="150000">Nivel 3 (+9)</option>
                                     </select>
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label"><small><strong>Duración:</strong></small></label>
                                     <select name="weeks" class="form-select form-select-sm weeks-select">
-                                        <option value="1" data-cost="200000">1 semana</option>
-                                        <option value="2" data-cost="400000">2 semanas</option>
-                                        <option value="3" data-cost="600000">3 semanas</option>
+                                        <option value="1" data-multiplier="1">1 semana</option>
+                                        <option value="2" data-multiplier="2">2 semanas</option>
+                                        <option value="3" data-multiplier="3">3 semanas</option>
                                     </select>
                                 </div>
                             </div>
@@ -279,15 +270,15 @@
                                 <div class="d-flex justify-content-between align-items-center">
                                     <strong>Costo Total:</strong>
                                     <span id="total_cost_engineer_{{ engineer.id }}" class="badge bg-success fs-6">
-                                        €400,000
+                                        €50,000
                                     </span>
                                 </div>
                             </div>
                             
-                            <button type="submit" class="btn btn-success btn-sm w-100 mt-2">
+                            <button type="button" class="btn btn-success btn-sm w-100 mt-2 start-training-btn">
                                 Iniciar Entrenamiento
                             </button>
-                        </form>
+                        </div>
                         {% else %}
                         <div class="text-center text-muted py-2">
                             <small>Otro entrenamiento en progreso</small>
@@ -387,8 +378,11 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('Página de entrenamiento cargada');
+
     // Calcular y actualizar costos totales
     function updateTotalCost(form) {
+        console.log('Actualizando costo para formulario:', form);
         const levelSelect = form.querySelector('.level-select');
         const weeksSelect = form.querySelector('.weeks-select');
         
@@ -397,13 +391,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const selectedWeeks = weeksSelect.options[weeksSelect.selectedIndex];
             
             const levelCost = parseInt(selectedLevel.dataset.cost);
-            const weeksCost = parseInt(selectedWeeks.dataset.cost);
-            const totalCost = levelCost + weeksCost;
+            const weeksMultiplier = parseInt(selectedWeeks.dataset.multiplier);
+            const totalCost = levelCost * weeksMultiplier;
             
-            // Encontrar el elemento de costo total específico para este formulario
-            const staffId = form.querySelector('input[name="staff_id"]').value;
-            const staffType = form.querySelector('input[name="staff_type"]').value;
+            const staffId = form.dataset.staffId;
+            const staffType = form.dataset.staffType;
             const totalElement = document.getElementById(`total_cost_${staffType}_${staffId}`);
+            
+            console.log('Costo calculado:', totalCost, 'Elemento:', totalElement);
             
             if (totalElement) {
                 totalElement.textContent = '€' + totalCost.toLocaleString();
@@ -411,57 +406,104 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Agregar event listeners a todos los selects
-    document.querySelectorAll('.level-select, .weeks-select').forEach(select => {
+    // Agregar event listeners
+    document.querySelectorAll('.level-select, .weeks-select, .attribute-select').forEach(select => {
         select.addEventListener('change', function() {
-            const form = this.closest('form');
+            console.log('Select cambiado:', this);
+            const form = this.closest('.training-form');
             updateTotalCost(form);
         });
     });
 
-    // Inicializar costos al cargar la página
+    // Inicializar costos
     document.querySelectorAll('.training-form').forEach(form => {
+        console.log('Inicializando formulario:', form);
         updateTotalCost(form);
     });
 
-    // Manejar envío de formularios
-    document.querySelectorAll('.training-form').forEach(form => {
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
+    // Manejar clic en botones de entrenamiento - CÓDIGO COMPLETAMENTE CORREGIDO
+    document.querySelectorAll('.start-training-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            console.log('Botón clickeado:', this);
             
-            const formData = new FormData(this);
-            const staffType = formData.get('staff_type');
-            const staffId = formData.get('staff_id');
-            const attribute = formData.get('attribute');
-            const level = formData.get('level');
-            const weeks = formData.get('weeks');
+            const form = this.closest('.training-form');
+            const staffType = form.dataset.staffType;
+            const staffId = form.dataset.staffId;
+            const attribute = form.querySelector('.attribute-select').value;
             
-            // Calcular costo total para confirmación
-            const levelCost = level * 200000;
-            const weeksCost = weeks * 200000;
-            const totalCost = levelCost + weeksCost;
+            // CÓDIGO CORREGIDO - Usar selectedIndex en lugar de :selected
+            const levelSelect = form.querySelector('.level-select');
+            const weeksSelect = form.querySelector('.weeks-select');
+            
+            const level = levelSelect.value;
+            const weeks = weeksSelect.value;
+            
+            // CORRECCIÓN: Obtener los valores usando selectedIndex
+            const levelCost = parseInt(levelSelect.options[levelSelect.selectedIndex].dataset.cost);
+            const weeksMultiplier = parseInt(weeksSelect.options[weeksSelect.selectedIndex].dataset.multiplier);
+            const totalCost = levelCost * weeksMultiplier;
+            
+            console.log('Datos recogidos:', { 
+                staffType, 
+                staffId, 
+                attribute, 
+                level, 
+                weeks, 
+                levelCost, 
+                weeksMultiplier, 
+                totalCost 
+            });
             
             if (confirm(`¿Confirmar entrenamiento?\n\nPersonal: ${staffType}\nAtributo: ${attribute}\nNivel: ${level} (+${level * 3} puntos)\nDuración: ${weeks} semana(s)\n\nCosto total: €${totalCost.toLocaleString()}`)) {
+                console.log('Usuario confirmó, enviando solicitud...');
+                
+                // Mostrar loading
+                const originalText = this.textContent;
+                this.textContent = 'Iniciando...';
+                this.disabled = true;
+                
                 fetch('/start_training', {
                     method: 'POST',
-                    body: formData
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        staff_type: staffType,
+                        staff_id: parseInt(staffId),
+                        attribute: attribute,
+                        level: parseInt(level),
+                        weeks: parseInt(weeks)
+                    })
                 })
-                .then(response => response.json())
+                .then(response => {
+                    console.log('Respuesta recibida:', response);
+                    if (!response.ok) {
+                        throw new Error('Error en la respuesta del servidor: ' + response.status);
+                    }
+                    return response.json();
+                })
                 .then(data => {
+                    console.log('Datos recibidos:', data);
                     if (data.success) {
-                        alert('Entrenamiento iniciado correctamente');
+                        alert('✅ ' + data.message);
                         location.reload();
                     } else {
-                        alert(data.message || 'Error al iniciar el entrenamiento');
+                        alert('❌ Error: ' + data.message);
+                        this.textContent = originalText;
+                        this.disabled = false;
                     }
                 })
                 .catch(error => {
-                    console.error('Error:', error);
-                    alert('Error al iniciar el entrenamiento');
+                    console.error('Error en fetch:', error);
+                    alert('❌ Error de conexión: ' + error.message);
+                    this.textContent = originalText;
+                    this.disabled = false;
                 });
             }
         });
     });
+
+    console.log('Todos los event listeners configurados correctamente');
 });
 </script>
 {% endblock %}

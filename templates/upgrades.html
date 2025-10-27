@@ -64,24 +64,23 @@
                     
                     <!-- Formulario de mejora -->
                     {% if not active_upgrade or active_upgrade.component_type == component.component_type %}
-                    <form class="upgrade-form">
-                        <input type="hidden" name="component_type" value="{{ component.component_type }}">
-                        
+                    <div class="upgrade-form" data-component-type="{{ component.component_type }}">
                         <!-- Selección de nivel -->
                         <div class="mb-3">
                             <label class="form-label"><small><strong>Nivel de Mejora:</strong></small></label>
                             <div class="btn-group w-100" role="group">
-                                <input type="radio" class="btn-check" name="level" id="level_{{ component.component_type }}_1" value="1" checked data-cost="500000">
+                                 <!-- REEMPLAZAR los costos actuales en upgrades.html -->
+                                <input type="radio" class="btn-check level-radio" name="level_{{ component.component_type }}" id="level_{{ component.component_type }}_1" value="1" checked data-cost="500000">
                                 <label class="btn btn-outline-primary btn-sm" for="level_{{ component.component_type }}_1">
                                     Nv 1<br>€500,000
                                 </label>
                                 
-                                <input type="radio" class="btn-check" name="level" id="level_{{ component.component_type }}_2" value="2" data-cost="1000000">
+                                <input type="radio" class="btn-check level-radio" name="level_{{ component.component_type }}" id="level_{{ component.component_type }}_2" value="2" data-cost="1000000">
                                 <label class="btn btn-outline-primary btn-sm" for="level_{{ component.component_type }}_2">
                                     Nv 2<br>€1,000,000
                                 </label>
                                 
-                                <input type="radio" class="btn-check" name="level" id="level_{{ component.component_type }}_3" value="3" data-cost="1500000">
+                                <input type="radio" class="btn-check level-radio" name="level_{{ component.component_type }}" id="level_{{ component.component_type }}_3" value="3" data-cost="1500000">
                                 <label class="btn btn-outline-primary btn-sm" for="level_{{ component.component_type }}_3">
                                     Nv 3<br>€1,500,000
                                 </label>
@@ -92,19 +91,19 @@
                         <div class="mb-3">
                             <label class="form-label"><small><strong>Duración:</strong></small></label>
                             <div class="btn-group w-100" role="group">
-                                <input type="radio" class="btn-check" name="weeks" id="weeks_{{ component.component_type }}_1" value="1" checked data-cost="500000">
+                                <input type="radio" class="btn-check weeks-radio" name="weeks_{{ component.component_type }}" id="weeks_{{ component.component_type }}_1" value="1" checked data-multiplier="1">
                                 <label class="btn btn-outline-secondary btn-sm" for="weeks_{{ component.component_type }}_1">
-                                    1 semana<br>€500,000
+                                    1 semana
                                 </label>
                                 
-                                <input type="radio" class="btn-check" name="weeks" id="weeks_{{ component.component_type }}_2" value="2" data-cost="1000000">
+                                <input type="radio" class="btn-check weeks-radio" name="weeks_{{ component.component_type }}" id="weeks_{{ component.component_type }}_2" value="2" data-multiplier="2">
                                 <label class="btn btn-outline-secondary btn-sm" for="weeks_{{ component.component_type }}_2">
-                                    2 semanas<br>€1,000,000
+                                    2 semanas
                                 </label>
                                 
-                                <input type="radio" class="btn-check" name="weeks" id="weeks_{{ component.component_type }}_3" value="3" data-cost="1500000">
+                                <input type="radio" class="btn-check weeks-radio" name="weeks_{{ component.component_type }}" id="weeks_{{ component.component_type }}_3" value="3" data-multiplier="3">
                                 <label class="btn btn-outline-secondary btn-sm" for="weeks_{{ component.component_type }}_3">
-                                    3 semanas<br>€1,500,000
+                                    3 semanas
                                 </label>
                             </div>
                         </div>
@@ -114,13 +113,13 @@
                             <div class="d-flex justify-content-between align-items-center">
                                 <strong>Costo Total:</strong>
                                 <span id="total_cost_{{ component.component_type }}" class="badge bg-success fs-6">
-                                    €1,000,000
+                                    €500,000
                                 </span>
                             </div>
                         </div>
 
                         {% if not active_upgrade %}
-                        <button type="submit" class="btn btn-success btn-sm w-100">
+                        <button type="button" class="btn btn-success btn-sm w-100 start-upgrade-btn">
                             Iniciar Mejora
                         </button>
                         {% else %}
@@ -128,7 +127,7 @@
                             Mejora en Progreso
                         </button>
                         {% endif %}
-                    </form>
+                    </div>
                     {% else %}
                     <div class="text-center text-muted py-2">
                         <small>Otra mejora en progreso</small>
@@ -211,14 +210,14 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Calcular y actualizar costos totales
     function updateTotalCost(componentType) {
-        const form = document.querySelector(`input[value="${componentType}"]`).closest('form');
-        const levelInput = form.querySelector('input[name="level"]:checked');
-        const weeksInput = form.querySelector('input[name="weeks"]:checked');
+        const form = document.querySelector(`.upgrade-form[data-component-type="${componentType}"]`);
+        const levelInput = form.querySelector('.level-radio:checked');
+        const weeksInput = form.querySelector('.weeks-radio:checked');
         
         if (levelInput && weeksInput) {
             const levelCost = parseInt(levelInput.dataset.cost);
-            const weeksCost = parseInt(weeksInput.dataset.cost);
-            const totalCost = levelCost + weeksCost;
+            const weeksMultiplier = parseInt(weeksInput.dataset.multiplier);
+            const totalCost = levelCost * weeksMultiplier;
             
             const totalElement = document.getElementById(`total_cost_${componentType}`);
             if (totalElement) {
@@ -228,52 +227,66 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Agregar event listeners a todos los radio buttons
-    document.querySelectorAll('input[type="radio"][name="level"], input[type="radio"][name="weeks"]').forEach(radio => {
+    document.querySelectorAll('.level-radio, .weeks-radio').forEach(radio => {
         radio.addEventListener('change', function() {
-            const form = this.closest('form');
-            const componentType = form.querySelector('input[name="component_type"]').value;
+            const form = this.closest('.upgrade-form');
+            const componentType = form.dataset.componentType;
             updateTotalCost(componentType);
         });
     });
 
     // Inicializar costos al cargar la página
     document.querySelectorAll('.upgrade-form').forEach(form => {
-        const componentType = form.querySelector('input[name="component_type"]').value;
+        const componentType = form.dataset.componentType;
         updateTotalCost(componentType);
     });
 
-    // Manejar envío de formularios
-    document.querySelectorAll('.upgrade-form').forEach(form => {
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
+    // Manejar clic en botones de mejora
+    document.querySelectorAll('.start-upgrade-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const form = this.closest('.upgrade-form');
+            const componentType = form.dataset.componentType;
+            const level = form.querySelector('.level-radio:checked').value;
+            const weeks = form.querySelector('.weeks-radio:checked').value;
             
-            const formData = new FormData(this);
-            const componentType = formData.get('component_type');
-            const level = formData.get('level');
-            const weeks = formData.get('weeks');
-            
-            // Calcular costo total para confirmación
-            const levelCost = level * 500000;
-            const weeksCost = weeks * 500000;
-            const totalCost = levelCost + weeksCost;
+            // Calcular costo total
+            const levelCost = parseInt(form.querySelector('.level-radio:checked').dataset.cost);
+            const weeksMultiplier = parseInt(form.querySelector('.weeks-radio:checked').dataset.multiplier);
+            const totalCost = levelCost * weeksMultiplier;
             
             if (confirm(`¿Confirmar mejora de ${componentType} - Nivel ${level} por ${weeks} semana(s)?\nCosto total: €${totalCost.toLocaleString()}`)) {
+                // Mostrar loading
+                const originalText = this.textContent;
+                this.textContent = 'Iniciando...';
+                this.disabled = true;
+                
                 fetch('/start_upgrade', {
                     method: 'POST',
-                    body: formData
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        component_type: componentType,
+                        level: parseInt(level),
+                        weeks: parseInt(weeks)
+                    })
                 })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        alert('Mejora iniciada correctamente');
+                        alert(data.message);
                         location.reload();
                     } else {
-                        alert(data.message || 'Error al iniciar la mejora');
+                        alert('Error: ' + data.message);
+                        this.textContent = originalText;
+                        this.disabled = false;
                     }
                 })
                 .catch(error => {
                     console.error('Error:', error);
                     alert('Error al iniciar la mejora');
+                    this.textContent = originalText;
+                    this.disabled = false;
                 });
             }
         });

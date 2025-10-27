@@ -599,6 +599,110 @@ POINTS_SYSTEM = {
 }
 FASTEST_LAP_POINT = 1
 
+class FinancialTransaction(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    team_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    transaction_type = db.Column(db.String(20), nullable=False)  # income, expense
+    category = db.Column(db.String(50), nullable=False)  # salary, upgrade, training, sponsorship, race_prize, etc.
+    amount = db.Column(db.Float, nullable=False)
+    description = db.Column(db.String(200), nullable=False)
+    balance_after = db.Column(db.Float, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    team = db.relationship('User', backref='financial_transactions')
+
+class Budget(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    team_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    category = db.Column(db.String(50), nullable=False)
+    allocated_amount = db.Column(db.Float, nullable=False)
+    spent_amount = db.Column(db.Float, default=0.0)
+    month = db.Column(db.Integer, nullable=False)  # 1-12
+    year = db.Column(db.Integer, nullable=False)
+    
+    team = db.relationship('User', backref='budgets')
+
+class FinanceSystem:
+    @staticmethod
+    def get_financial_summary(team_id, months=6):
+        """Obtiene un resumen financiero de los últimos meses"""
+        cutoff_date = datetime.utcnow() - timedelta(days=30*months)
+        
+        # Consultas separadas para ingresos y gastos
+        income_data = db.session.query(
+            db.func.strftime('%Y-%m', FinancialTransaction.created_at).label('month'),
+            db.func.sum(FinancialTransaction.amount).label('amount')
+        ).filter(
+            FinancialTransaction.team_id == team_id,
+            FinancialTransaction.transaction_type == 'income',
+            FinancialTransaction.created_at >= cutoff_date
+        ).group_by('month').all()
+        
+        expense_data = db.session.query(
+            db.func.strftime('%Y-%m', FinancialTransaction.created_at).label('month'),
+            db.func.sum(FinancialTransaction.amount).label('amount')
+        ).filter(
+            FinancialTransaction.team_id == team_id,
+            FinancialTransaction.transaction_type == 'expense',
+            FinancialTransaction.created_at >= cutoff_date
+        ).group_by('month').all()
+        
+        # Convertir a diccionarios para fácil acceso
+        income_dict = {item.month: item.amount or 0 for item in income_data}
+        expense_dict = {item.month: item.amount or 0 for item in expense_data}
+        
+        # Combinar todos los meses únicos
+        all_months = sorted(set(list(income_dict.keys()) + list(expense_dict.keys())))
+        
+        monthly_data = []
+        for month in all_months:
+            monthly_data.append({
+                'month': month,
+                'income': income_dict.get(month, 0),
+                'expenses': expense_dict.get(month, 0)
+            })
+        
+        # Totales por categoría
+        category_totals = db.session.query(
+            FinancialTransaction.category,
+            FinancialTransaction.transaction_type,
+            db.func.sum(FinancialTransaction.amount).label('total')
+        ).filter(
+            FinancialTransaction.team_id == team_id,
+            FinancialTransaction.created_at >= cutoff_date
+        ).group_by(FinancialTransaction.category, FinancialTransaction.transaction_type).all()
+        
+        return {
+            'monthly_data': monthly_data,
+            'category_totals': category_totals
+        }
+
+    @staticmethod
+    def record_transaction(team_id, transaction_type, category, amount, description):
+        """Registra una transacción financiera"""
+        user = User.query.get(team_id)
+        if not user:
+            return False
+            
+        # Actualizar el saldo del usuario según el tipo de transacción
+        if transaction_type == 'income':
+            user.money += amount
+        elif transaction_type == 'expense':
+            user.money -= amount
+        
+        transaction = FinancialTransaction(
+            team_id=team_id,
+            transaction_type=transaction_type,
+            category=category,
+            amount=amount,
+            description=description,
+            balance_after=user.money
+        )
+        
+        db.session.add(transaction)
+        db.session.commit()
+        return True
+
 # Rutas de la aplicación
 @app.route('/')
 def index():
@@ -755,7 +859,9 @@ def dashboard():
 @app.route('/team')
 @login_required
 def team_management():
-    return render_template('team.html', team=current_user)
+    from datetime import datetime
+    current_date = datetime.utcnow()
+    return render_template('team.html', team=current_user, current_date=current_date)
 
 @app.route('/market')
 @login_required
@@ -776,10 +882,22 @@ def buy_driver(driver_id):
         return jsonify({'success': False, 'message': 'Límite de pilotos alcanzado'})
     
     driver = Driver.query.get(driver_id)
-    if driver and driver.market_available and current_user.money >= driver.salary:
-        current_user.money -= driver.salary
+    purchase_cost = driver.salary  # 1 salario como adelanto
+    
+    if driver and driver.market_available and current_user.money >= purchase_cost:
+        # ELIMINAR esta línea: current_user.money -= purchase_cost
         driver.team_id = current_user.id
         driver.market_available = False
+        
+        # Registrar transacción (esto ya actualiza el dinero automáticamente)
+        FinanceSystem.record_transaction(
+            current_user.id,
+            'expense',
+            'salary_advance',
+            purchase_cost,
+            f'Adelanto de salario - {driver.name}'
+        )
+        
         db.session.commit()
         return jsonify({'success': True, 'message': 'Piloto comprado'})
     
@@ -793,9 +911,18 @@ def buy_mechanic(mechanic_id):
     
     mechanic = Mechanic.query.get(mechanic_id)
     if mechanic and mechanic.market_available and current_user.money >= mechanic.salary:
-        current_user.money -= mechanic.salary
         mechanic.team_id = current_user.id
         mechanic.market_available = False
+        
+        # Registrar transacción
+        FinanceSystem.record_transaction(
+            current_user.id,
+            'expense',
+            'salary_advance',
+            mechanic.salary,
+            f'Adelanto de salario - {mechanic.name}'
+        )
+        
         db.session.commit()
         return jsonify({'success': True, 'message': 'Mecánico contratado'})
     
@@ -809,23 +936,56 @@ def buy_engineer(engineer_id):
     
     engineer = Engineer.query.get(engineer_id)
     if engineer and engineer.market_available and current_user.money >= engineer.salary:
-        current_user.money -= engineer.salary
         engineer.team_id = current_user.id
         engineer.market_available = False
+        
+        # Registrar transacción
+        FinanceSystem.record_transaction(
+            current_user.id,
+            'expense',
+            'salary_advance',
+            engineer.salary,
+            f'Adelanto de salario - {engineer.name}'
+        )
+        
         db.session.commit()
         return jsonify({'success': True, 'message': 'Ingeniero contratado'})
     
     return jsonify({'success': False, 'message': 'Error en la contratación'})
+
+# Modificar las rutas de despido en app.py
 
 @app.route('/fire/driver/<int:driver_id>')
 @login_required
 def fire_driver(driver_id):
     driver = Driver.query.get(driver_id)
     if driver and driver.team_id == current_user.id:
+        # Calcular años con el equipo
+        years_with_team = (datetime.utcnow().date() - driver.created_at.date()).days // 365
+        
+        # Calcular indemnización
+        from staff_generator import calculate_severance_payment
+        severance_payment = calculate_severance_payment(driver.salary, years_with_team)
+        
+        # Verificar si el usuario tiene suficiente dinero
+        if current_user.money < severance_payment:
+            return jsonify({
+                'success': False, 
+                'message': f'No tienes suficiente dinero para pagar la indemnización (€{severance_payment:,.0f})'
+            })
+        
+        # Aplicar el pago
+        current_user.money -= severance_payment
+        
+        # Despedir al piloto
         driver.team_id = None
         driver.market_available = True
+        
         db.session.commit()
-        return jsonify({'success': True, 'message': 'Piloto despedido'})
+        return jsonify({
+            'success': True, 
+            'message': f'Piloto despedido. Indemnización pagada: €{severance_payment:,.0f}'
+        })
     
     return jsonify({'success': False, 'message': 'Error al despedir'})
 
@@ -834,10 +994,32 @@ def fire_driver(driver_id):
 def fire_mechanic(mechanic_id):
     mechanic = Mechanic.query.get(mechanic_id)
     if mechanic and mechanic.team_id == current_user.id:
+        # Calcular años con el equipo
+        years_with_team = (datetime.utcnow().date() - mechanic.created_at.date()).days // 365
+        
+        # Calcular indemnización
+        from staff_generator import calculate_severance_payment
+        severance_payment = calculate_severance_payment(mechanic.salary, years_with_team)
+        
+        # Verificar si el usuario tiene suficiente dinero
+        if current_user.money < severance_payment:
+            return jsonify({
+                'success': False, 
+                'message': f'No tienes suficiente dinero para pagar la indemnización (€{severance_payment:,.0f})'
+            })
+        
+        # Aplicar el pago
+        current_user.money -= severance_payment
+        
+        # Despedir al mecánico
         mechanic.team_id = None
         mechanic.market_available = True
+        
         db.session.commit()
-        return jsonify({'success': True, 'message': 'Mecánico despedido'})
+        return jsonify({
+            'success': True, 
+            'message': f'Mecánico despedido. Indemnización pagada: €{severance_payment:,.0f}'
+        })
     
     return jsonify({'success': False, 'message': 'Error al despedir'})
 
@@ -846,10 +1028,32 @@ def fire_mechanic(mechanic_id):
 def fire_engineer(engineer_id):
     engineer = Engineer.query.get(engineer_id)
     if engineer and engineer.team_id == current_user.id:
+        # Calcular años con el equipo
+        years_with_team = (datetime.utcnow().date() - engineer.created_at.date()).days // 365
+        
+        # Calcular indemnización
+        from staff_generator import calculate_severance_payment
+        severance_payment = calculate_severance_payment(engineer.salary, years_with_team)
+        
+        # Verificar si el usuario tiene suficiente dinero
+        if current_user.money < severance_payment:
+            return jsonify({
+                'success': False, 
+                'message': f'No tienes suficiente dinero para pagar la indemnización (€{severance_payment:,.0f})'
+            })
+        
+        # Aplicar el pago
+        current_user.money -= severance_payment
+        
+        # Despedir al ingeniero
         engineer.team_id = None
         engineer.market_available = True
+        
         db.session.commit()
-        return jsonify({'success': True, 'message': 'Ingeniero despedido'})
+        return jsonify({
+            'success': True, 
+            'message': f'Ingeniero despedido. Indemnización pagada: €{severance_payment:,.0f}'
+        })
     
     return jsonify({'success': False, 'message': 'Error al despedir'})
 
@@ -875,64 +1079,73 @@ def upgrades():
 @app.route('/start_upgrade', methods=['POST'])
 @login_required
 def start_upgrade():
-    # Verificar si ya hay una mejora en progreso
-    active_upgrade = Upgrade.query.filter_by(
-        team_id=current_user.id, 
-        completed=False
-    ).first()
-    
-    if active_upgrade:
+    try:
+        # Obtener datos del JSON
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'Datos no válidos'})
+        
+        component_type = data.get('component_type')
+        level = int(data.get('level', 1))
+        weeks = int(data.get('weeks', 1))
+        
+        # Validar datos
+        if not component_type:
+            return jsonify({'success': False, 'message': 'Tipo de componente requerido'})
+        
+        valid_components = ['engine', 'aerodynamics', 'brakes', 'suspension']
+        if component_type not in valid_components:
+            return jsonify({'success': False, 'message': 'Tipo de componente no válido'})
+        
+        # Calcular costo basado en nivel y semanas
+        base_cost = 500000 * level
+        total_cost = base_cost * weeks
+        
+        if current_user.money < total_cost:
+            return jsonify({'success': False, 'message': f'Fondos insuficientes. Necesitas €{total_cost:,.0f}'})
+        
+        # Verificar si ya hay una mejora en progreso
+        active_upgrade = Upgrade.query.filter_by(
+            team_id=current_user.id, 
+            completed=False
+        ).first()
+        
+        if active_upgrade:
+            return jsonify({'success': False, 'message': 'Ya tienes una mejora en progreso'})
+        
+        # Crear la mejora
+        upgrade = Upgrade(
+            team_id=current_user.id,
+            component_type=component_type,
+            level=level,
+            weeks=weeks,
+            total_cost=total_cost,
+            start_date=datetime.utcnow(),
+            end_date=datetime.utcnow() + timedelta(weeks=weeks),
+            completed=False
+        )
+        
+        # Registrar transacción financiera
+        FinanceSystem.record_transaction(
+            current_user.id,
+            'expense',
+            'upgrade',
+            total_cost,
+            f'Mejora de {component_type} - Nivel {level} ({weeks} semanas)'
+        )
+        
+        db.session.add(upgrade)
+        db.session.commit()
+        
         return jsonify({
-            'success': False, 
-            'message': 'Ya tienes una mejora en progreso'
-        }), 400
-
-    # Obtener datos del nuevo formulario
-    component_type = request.form.get('component_type')
-    level = int(request.form.get('level'))
-    weeks = int(request.form.get('weeks'))
-    
-    # Validar datos
-    if not component_type or level not in [1, 2, 3] or weeks not in [1, 2, 3]:
-        return jsonify({
-            'success': False, 
-            'message': 'Datos de mejora inválidos'
-        }), 400
-
-    # Calcular costo total (500,000 por nivel y por semana)
-    level_cost = level * 500000
-    weeks_cost = weeks * 500000
-    total_cost = level_cost + weeks_cost
-    
-    # Verificar fondos
-    if current_user.money < total_cost:
-        return jsonify({
-            'success': False, 
-            'message': 'Fondos insuficientes para esta mejora'
-        }), 400
-    
-    # Crear la mejora
-    upgrade = Upgrade(
-        team_id=current_user.id,
-        component_type=component_type,
-        level=level,
-        weeks=weeks,
-        total_cost=total_cost,
-        start_date=datetime.utcnow(),
-        end_date=datetime.utcnow() + timedelta(weeks=weeks),
-        completed=False
-    )
-    
-    # Deducción de dinero
-    current_user.money -= total_cost
-    
-    db.session.add(upgrade)
-    db.session.commit()
-    
-    return jsonify({
-        'success': True,
-        'message': f'Mejora iniciada. Costo: €{total_cost:,.0f}'
-    })
+            'success': True,
+            'message': f'Mejora de {component_type} iniciada. Costo: €{total_cost:,.0f}',
+            'cost': total_cost
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Error al iniciar mejora: {str(e)}'})
 
 @app.route('/complete_upgrade/<int:upgrade_id>', methods=['POST'])
 @login_required
@@ -993,83 +1206,90 @@ def training():
 @app.route('/start_training', methods=['POST'])
 @login_required
 def start_training():
-    # Verificar si ya hay un entrenamiento en progreso
-    active_training = Training.query.filter_by(
-        team_id=current_user.id, 
-        completed=False
-    ).first()
-    
-    if active_training:
+    try:
+        # Obtener datos del JSON
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'Datos no válidos'})
+        
+        staff_type = data.get('staff_type')
+        staff_id = int(data.get('staff_id'))
+        attribute = data.get('attribute')
+        level = int(data.get('level', 1))
+        weeks = int(data.get('weeks', 1))
+        
+        # Validar datos
+        if not all([staff_type, staff_id, attribute]):
+            return jsonify({'success': False, 'message': 'Datos incompletos'})
+        
+        valid_staff_types = ['driver', 'mechanic', 'engineer']
+        if staff_type not in valid_staff_types:
+            return jsonify({'success': False, 'message': 'Tipo de personal no válido'})
+        
+        # Verificar que el personal pertenece al equipo
+        staff = None
+        if staff_type == 'driver':
+            staff = Driver.query.filter_by(id=staff_id, team_id=current_user.id).first()
+        elif staff_type == 'mechanic':
+            staff = Mechanic.query.filter_by(id=staff_id, team_id=current_user.id).first()
+        elif staff_type == 'engineer':
+            staff = Engineer.query.filter_by(id=staff_id, team_id=current_user.id).first()
+        
+        if not staff:
+            return jsonify({'success': False, 'message': 'Personal no encontrado o no pertenece a tu equipo'})
+        
+        # Calcular costo basado en nivel y semanas
+        base_cost = 500000 * level
+        total_cost = base_cost * weeks
+        
+        if current_user.money < total_cost:
+            return jsonify({'success': False, 'message': f'Fondos insuficientes. Necesitas €{total_cost:,.0f}'})
+        
+        # Verificar si ya hay un entrenamiento en progreso para este staff
+        active_training = Training.query.filter_by(
+            team_id=current_user.id,
+            staff_id=staff_id,
+            completed=False
+        ).first()
+        
+        if active_training:
+            return jsonify({'success': False, 'message': 'Este miembro ya tiene un entrenamiento en progreso'})
+        
+        # Crear el entrenamiento
+        training = Training(
+            team_id=current_user.id,
+            staff_type=staff_type,
+            staff_id=staff_id,
+            attribute=attribute,
+            level=level,
+            weeks=weeks,
+            total_cost=total_cost,
+            start_date=datetime.utcnow(),
+            end_date=datetime.utcnow() + timedelta(weeks=weeks),
+            completed=False
+        )
+        
+        # Registrar transacción financiera
+        FinanceSystem.record_transaction(
+            current_user.id,
+            'expense',
+            'training',
+            total_cost,
+            f'Entrenamiento {staff_type} - {attribute} (Nivel {level})'
+        )
+        
+        db.session.add(training)
+        db.session.commit()
+        
         return jsonify({
-            'success': False, 
-            'message': 'Ya tienes un entrenamiento en progreso'
-        }), 400
-
-    # Obtener datos del formulario
-    staff_type = request.form.get('staff_type')
-    staff_id = int(request.form.get('staff_id'))
-    attribute = request.form.get('attribute')
-    level = int(request.form.get('level'))
-    weeks = int(request.form.get('weeks'))
-    
-    # Validar datos
-    if not staff_type or not attribute or level not in [1, 2, 3] or weeks not in [1, 2, 3]:
-        return jsonify({
-            'success': False, 
-            'message': 'Datos de entrenamiento inválidos'
-        }), 400
-
-    # Verificar que el staff pertenece al equipo
-    staff = None
-    if staff_type == 'driver':
-        staff = Driver.query.filter_by(id=staff_id, team_id=current_user.id).first()
-    elif staff_type == 'mechanic':
-        staff = Mechanic.query.filter_by(id=staff_id, team_id=current_user.id).first()
-    elif staff_type == 'engineer':
-        staff = Engineer.query.filter_by(id=staff_id, team_id=current_user.id).first()
-    
-    if not staff:
-        return jsonify({
-            'success': False, 
-            'message': 'Personal no encontrado o no pertenece a tu equipo'
-        }), 400
-
-    # Calcular costo total (200,000 por nivel y por semana)
-    level_cost = level * 200000
-    weeks_cost = weeks * 200000
-    total_cost = level_cost + weeks_cost
-    
-    # Verificar fondos
-    if current_user.money < total_cost:
-        return jsonify({
-            'success': False, 
-            'message': 'Fondos insuficientes para este entrenamiento'
-        }), 400
-    
-    # Crear el entrenamiento
-    training = Training(
-        team_id=current_user.id,
-        staff_type=staff_type,
-        staff_id=staff_id,
-        attribute=attribute,
-        level=level,
-        weeks=weeks,
-        total_cost=total_cost,
-        start_date=datetime.utcnow(),
-        end_date=datetime.utcnow() + timedelta(weeks=weeks),
-        completed=False
-    )
-    
-    # Deducción de dinero
-    current_user.money -= total_cost
-    
-    db.session.add(training)
-    db.session.commit()
-    
-    return jsonify({
-        'success': True,
-        'message': f'Entrenamiento iniciado. Costo: €{total_cost:,.0f}'
-    })
+            'success': True,
+            'message': f'Entrenamiento iniciado. Costo: €{total_cost:,.0f}',
+            'cost': total_cost
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Error al iniciar entrenamiento: {str(e)}'})
 
 @app.route('/complete_training/<int:training_id>', methods=['POST'])
 @login_required
@@ -1209,13 +1429,21 @@ def scheduled_retirement_check():
         if retired_count > 0:
             print(f"✅ {retired_count} empleados jubilados automáticamente y reemplazados")
 
+def scheduled_aging_update():
+    """Actualización programada del envejecimiento del personal"""
+    with app.app_context():
+        from staff_generator import update_staff_aging
+        update_staff_aging()
+        print("✅ Sistema de envejecimiento del personal actualizado")
+
 # Tareas programadas
 scheduler = BackgroundScheduler()
 
 # Configurar las tareas programadas
 scheduler.add_job(scheduled_training_completion, 'interval', hours=1)
 scheduler.add_job(scheduled_upgrade_completion, 'interval', hours=1)
-scheduler.add_job(scheduled_retirement_check, 'interval', hours=24)  # Verificar jubilaciones cada 24 horas
+scheduler.add_job(scheduled_retirement_check, 'interval', hours=24) # Verificar jubilaciones cada 24 horas
+scheduler.add_job(scheduled_aging_update, 'interval', days=30)
 
 def simulate_scheduled_races():
     with app.app_context():
@@ -1581,6 +1809,145 @@ def simulate_test():
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Error en la simulación: {str(e)}'})
+
+@app.route('/finances')
+@login_required
+def finances():
+    """Página principal de finanzas"""
+    # Obtener transacciones recientes
+    recent_transactions = FinancialTransaction.query.filter_by(
+        team_id=current_user.id
+    ).order_by(FinancialTransaction.created_at.desc()).limit(50).all()
+    
+    # Calcular gastos mensuales en salarios
+    monthly_salary_cost = 0
+    for driver in current_user.drivers:
+        monthly_salary_cost += driver.salary
+    for mechanic in current_user.mechanics:
+        monthly_salary_cost += mechanic.salary
+    for engineer in current_user.engineers:
+        monthly_salary_cost += engineer.salary
+    
+    # Calcular totales
+    total_income = sum(t.amount for t in recent_transactions if t.transaction_type == 'income')
+    total_expenses = sum(t.amount for t in recent_transactions if t.transaction_type == 'expense')
+    net_balance = total_income - total_expenses
+    
+    return render_template('finances.html',
+                         transactions=recent_transactions,
+                         monthly_salary_cost=monthly_salary_cost,
+                         total_income=total_income,
+                         total_expenses=total_expenses,
+                         net_balance=net_balance)
+
+@app.route('/api/finances/transactions')
+@login_required
+def api_finance_transactions():
+    """API para obtener transacciones con filtros"""
+    page = request.args.get('page', 1, type=int)
+    per_page = 20
+    
+    # Filtros
+    transaction_type = request.args.get('type')
+    category = request.args.get('category')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    
+    query = FinancialTransaction.query.filter_by(team_id=current_user.id)
+    
+    if transaction_type and transaction_type != 'all':
+        query = query.filter_by(transaction_type=transaction_type)
+    
+    if category and category != 'all':
+        query = query.filter_by(category=category)
+    
+    if start_date:
+        try:
+            start_date = datetime.strptime(start_date, '%Y-%m-%d')
+            query = query.filter(FinancialTransaction.created_at >= start_date)
+        except ValueError:
+            pass
+    
+    if end_date:
+        try:
+            end_date = datetime.strptime(end_date, '%Y-%m-%d')
+            query = query.filter(FinancialTransaction.created_at <= end_date)
+        except ValueError:
+            pass
+    
+    transactions = query.order_by(FinancialTransaction.created_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    transactions_data = []
+    for transaction in transactions.items:
+        transactions_data.append({
+            'id': transaction.id,
+            'type': transaction.transaction_type,
+            'category': transaction.category,
+            'amount': transaction.amount,
+            'description': transaction.description,
+            'balance_after': transaction.balance_after,
+            'date': transaction.created_at.strftime('%d/%m/%Y %H:%M')
+        })
+    
+    return jsonify({
+        'transactions': transactions_data,
+        'total_pages': transactions.pages,
+        'current_page': page,
+        'has_next': transactions.has_next,
+        'has_prev': transactions.has_prev
+    })
+
+@app.route('/api/finances/stats')
+@login_required
+def api_finance_stats():
+    """API para obtener estadísticas financieras"""
+    # Últimos 6 meses
+    cutoff_date = datetime.utcnow() - timedelta(days=180)
+    
+    # Ingresos y gastos por mes
+    monthly_stats = db.session.query(
+        db.func.strftime('%Y-%m', FinancialTransaction.created_at).label('month'),
+        db.func.sum(
+            db.case(
+                (FinancialTransaction.transaction_type == 'income', FinancialTransaction.amount),
+                else_=0
+            )
+        ).label('income'),
+        db.func.sum(
+            db.case(
+                (FinancialTransaction.transaction_type == 'expense', FinancialTransaction.amount),
+                else_=0
+            )
+        ).label('expenses')
+    ).filter(
+        FinancialTransaction.team_id == current_user.id,
+        FinancialTransaction.created_at >= cutoff_date
+    ).group_by('month').order_by('month').all()
+    
+    # Gastos por categoría (último mes)
+    last_month = datetime.utcnow().replace(day=1) - timedelta(days=1)
+    category_stats = db.session.query(
+        FinancialTransaction.category,
+        db.func.sum(FinancialTransaction.amount).label('total')
+    ).filter(
+        FinancialTransaction.team_id == current_user.id,
+        FinancialTransaction.transaction_type == 'expense',
+        db.func.strftime('%Y-%m', FinancialTransaction.created_at) == last_month.strftime('%Y-%m')
+    ).group_by(FinancialTransaction.category).all()
+    
+    return jsonify({
+        'monthly_stats': [{
+            'month': stat.month,
+            'income': stat.income or 0,
+            'expenses': stat.expenses or 0
+        } for stat in monthly_stats],
+        'category_stats': [{
+            'category': stat.category,
+            'total': stat.total or 0
+        } for stat in category_stats]
+    })
 
 # Funciones auxiliares para la simulación de tests
 def simulate_test_laps(driver, initial_tyre, total_laps, track_condition):

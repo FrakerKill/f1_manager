@@ -252,3 +252,78 @@ def handle_retirements():
             )
     
     return len(retired_drivers) + len(retired_mechanics) + len(retired_engineers)
+    
+# Añadir al final de staff_generator.py
+
+def calculate_severance_payment(salary, years_with_team):
+    """Calcula la indemnización por despido"""
+    base_payment = salary * 2  # 2 carreras de salario base
+    seniority_bonus = salary * years_with_team * 0.5  # 0.5 salarios por año
+    return base_payment + seniority_bonus
+
+def update_staff_aging():
+    """Actualiza la edad y habilidades del personal cada temporada"""
+    today = date.today()
+    
+    # Actualizar pilotos
+    drivers = Driver.query.filter(Driver.team_id.isnot(None)).all()
+    for driver in drivers:
+        driver.age = today.year - driver.date_of_birth.year
+        
+        # Calcular años de experiencia profesional (asumiendo debut a 18 años)
+        career_years = max(0, driver.age - 18)
+        
+        # Aplicar efectos del envejecimiento
+        if career_years > 8:  # Después de 8 años de carrera
+            decline_factor = (career_years - 8) * 0.5  # 0.5% de declive por año
+            
+            # Habilidades que disminuyen con la edad
+            driver.skill = max(40, driver.skill - decline_factor)
+            driver.aggression = max(30, driver.aggression - decline_factor)
+            driver.growth_potential = max(20, driver.growth_potential - decline_factor * 2)
+            
+            # La experiencia sigue aumentando pero más lentamente
+            experience_gain = random.randint(1, 3)
+            driver.experience = min(95, driver.experience + experience_gain)
+        else:
+            # Fase de crecimiento (primeros 8 años)
+            skill_gain = random.randint(2, 5)
+            experience_gain = random.randint(3, 6)
+            
+            driver.skill = min(95, driver.skill + skill_gain)
+            driver.experience = min(95, driver.experience + experience_gain)
+    
+    # Actualizar mecánicos
+    mechanics = Mechanic.query.filter(Mechanic.team_id.isnot(None)).all()
+    for mechanic in mechanics:
+        mechanic.age = today.year - mechanic.date_of_birth.year
+        career_years = max(0, mechanic.age - 25)  # Carrera desde los 25
+        
+        if career_years > 15:  # Después de 15 años de carrera
+            decline_factor = (career_years - 15) * 0.3
+            
+            mechanic.pit_stop_skill = max(40, mechanic.pit_stop_skill - decline_factor)
+            mechanic.growth_potential = max(10, mechanic.growth_potential - decline_factor * 2)
+        else:
+            skill_gain = random.randint(1, 3)
+            mechanic.pit_stop_skill = min(95, mechanic.pit_stop_skill + skill_gain)
+            mechanic.reliability_skill = min(95, mechanic.reliability_skill + skill_gain)
+    
+    # Actualizar ingenieros
+    engineers = Engineer.query.filter(Engineer.team_id.isnot(None)).all()
+    for engineer in engineers:
+        engineer.age = today.year - engineer.date_of_birth.year
+        career_years = max(0, engineer.age - 30)  # Carrera desde los 30
+        
+        if career_years > 20:  # Después de 20 años de carrera
+            decline_factor = (career_years - 20) * 0.4
+            
+            engineer.innovation = max(45, engineer.innovation - decline_factor)
+            engineer.development_speed = max(40, engineer.development_speed - decline_factor)
+            engineer.growth_potential = max(15, engineer.growth_potential - decline_factor * 2)
+        else:
+            skill_gain = random.randint(1, 4)
+            engineer.innovation = min(95, engineer.innovation + skill_gain)
+            engineer.development_speed = min(95, engineer.development_speed + skill_gain)
+    
+    db.session.commit()

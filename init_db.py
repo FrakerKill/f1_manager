@@ -76,36 +76,56 @@ def init_weather_forecasts():
     db.session.commit()
 
 def init_weather_changes():
-    """Crea cambios meteorológicos durante las carreras"""
+    """Crea cambios meteorológicos durante las carreras con transiciones lógicas y secuenciales"""
     races = Race.query.all()
     
     for race in races:
         # Para cada carrera, crear 1-3 cambios meteorológicos posibles
         num_changes = random.randint(1, 3)
-        for _ in range(num_changes):
-            change_lap = random.randint(5, race.circuit.laps - 5)  # Cambio entre vuelta 5 y final-5
+        
+        # Condición inicial de la carrera (basada en el pronóstico de carrera)
+        race_forecast = WeatherForecast.query.filter_by(
+            race_id=race.id, 
+            session_type='race'
+        ).first()
+        
+        current_condition = race_forecast.condition if race_forecast else 'dry'
+        last_change_lap = 0
+        
+        for change_num in range(num_changes):
+            # Espaciar cambios mínimamente 10 vueltas entre ellos
+            min_lap = last_change_lap + 10
+            max_lap = race.circuit.laps - 5 - (num_changes - change_num - 1) * 10
             
-            # Posibles transiciones meteorológicas
-            transitions = [
-                ('dry', 'light_rain'),
-                ('light_rain', 'dry'),
-                ('light_rain', 'heavy_rain'),
-                ('heavy_rain', 'light_rain'),
-                ('dry', 'heavy_rain'),
-                ('heavy_rain', 'dry')
-            ]
+            if min_lap >= max_lap:
+                break  # No hay espacio para más cambios
+                
+            change_lap = random.randint(min_lap, max_lap)
+            last_change_lap = change_lap
             
-            from_condition, to_condition = random.choice(transitions)
+            # Transiciones lógicas basadas en la condición actual
+            possible_transitions = {
+                'dry': ['light_rain'],
+                'light_rain': ['dry', 'heavy_rain'],
+                'heavy_rain': ['light_rain']
+            }
             
-            weather_change = WeatherChange(
-                race_id=race.id,
-                session_type='race',
-                change_lap=change_lap,
-                from_condition=from_condition,
-                to_condition=to_condition,
-                probability=random.uniform(0.3, 0.8)  # 30-80% de probabilidad
-            )
-            db.session.add(weather_change)
+            # Verificar transiciones posibles
+            if current_condition in possible_transitions:
+                to_condition = random.choice(possible_transitions[current_condition])
+                
+                weather_change = WeatherChange(
+                    race_id=race.id,
+                    session_type='race',
+                    change_lap=change_lap,
+                    from_condition=current_condition,
+                    to_condition=to_condition,
+                    probability=random.uniform(0.3, 0.8)  # 30-80% de probabilidad
+                )
+                db.session.add(weather_change)
+                
+                # Actualizar condición actual para el próximo cambio
+                current_condition = to_condition
     
     db.session.commit()
 
