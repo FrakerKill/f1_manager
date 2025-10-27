@@ -73,6 +73,10 @@
                         Sesión de Tests
                     </a>
                     
+					<a href="{{ url_for('qualifying_session', race_id=race.id) }}" class="btn btn-outline-warning">
+                        Clasificación
+                    </a>
+					
                     <a href="{{ url_for('race_strategy', race_id=race.id) }}" class="btn btn-outline-info">
                         Planificar Estrategia
                     </a>

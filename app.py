@@ -18,6 +18,12 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
+# CONTEXT PROCESSOR PARA INYECTAR 'now' EN TODAS LAS PLANTILLAS
+@app.context_processor
+def inject_now():
+    """Inyecta la fecha/hora actual en todas las plantillas"""
+    return {'now': datetime.utcnow()}
+
 # Modelos de la base de datos
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -204,6 +210,22 @@ class Race(db.Model):
     race_session = db.Column(db.DateTime, nullable=False)
     
     circuit = db.relationship('Circuit', backref='races')
+    
+class QualifyingSession(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    race_id = db.Column(db.Integer, db.ForeignKey('race.id'), nullable=False)
+    team_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    driver_id = db.Column(db.Integer, db.ForeignKey('driver.id'), nullable=False)
+    tyre_choice = db.Column(db.String(20), nullable=False)  # soft, medium, hard, wet, extreme_wet
+    q1_time = db.Column(db.Float)  # Tiempo en Q1
+    q2_time = db.Column(db.Float)  # Tiempo en Q2  
+    q3_time = db.Column(db.Float)  # Tiempo en Q3
+    final_position = db.Column(db.Integer)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    race = db.relationship('Race', backref='qualifying_sessions')
+    team = db.relationship('User', backref='qualifying_sessions')
+    driver = db.relationship('Driver', backref='qualifying_sessions')
 
 class RaceResult(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -702,6 +724,33 @@ class FinanceSystem:
         db.session.add(transaction)
         db.session.commit()
         return True
+
+@app.context_processor
+def utility_processor():
+    def get_tyre_badge_color(tyre_type):
+        colors = {
+            'soft': 'danger',
+            'medium': 'warning', 
+            'hard': 'secondary',
+            'wet': 'info',
+            'extreme_wet': 'primary'
+        }
+        return colors.get(tyre_type, 'primary')
+    
+    def get_tyre_display_name(tyre_type):
+        names = {
+            'soft': 'Blando',
+            'medium': 'Medio',
+            'hard': 'Duro',
+            'wet': 'Lluvia',
+            'extreme_wet': 'Lluvia Extrema'
+        }
+        return names.get(tyre_type, tyre_type)
+    
+    return {
+        'get_tyre_badge_color': get_tyre_badge_color,
+        'get_tyre_display_name': get_tyre_display_name
+    }
 
 # Rutas de la aplicación
 @app.route('/')
@@ -1948,6 +1997,487 @@ def api_finance_stats():
             'total': stat.total or 0
         } for stat in category_stats]
     })
+
+# Añadir en app.py después de las rutas existentes
+
+@app.route('/qualifying/<int:race_id>')
+@login_required
+def qualifying_session(race_id):
+    """Página de preparación para la clasificación"""
+    race = Race.query.get_or_404(race_id)
+    
+    # Obtener pronóstico específico para la clasificación
+    qualifying_weather = WeatherForecast.query.filter_by(
+        race_id=race_id, 
+        session_type='qualifying'
+    ).first()
+    
+    # CORREGIDO: Obtener elecciones existentes de forma más precisa
+    existing_choices = []
+    team_drivers = current_user.drivers
+    
+    # DEBUG detallado
+    print(f"DEBUG: Iniciando busqueda de elecciones para equipo {current_user.id}")
+    print(f"DEBUG: Pilotos del equipo: {[d.id for d in team_drivers]}")
+    
+    for driver in team_drivers:
+        choice = QualifyingSession.query.filter_by(
+            race_id=race_id,
+            team_id=current_user.id,
+            driver_id=driver.id
+        ).first()
+        
+        if choice:
+            existing_choices.append(choice)
+            print(f"DEBUG: [MATCH] Eleccion para {driver.name} (ID:{driver.id}): {choice.tyre_choice}")
+        else:
+            print(f"DEBUG: [NO MATCH] Sin eleccion para {driver.name} (ID:{driver.id})")
+    
+    # Verificar si hay elecciones huérfanas (para otros pilotos)
+    orphan_choices = QualifyingSession.query.filter_by(
+        race_id=race_id,
+        team_id=current_user.id
+    ).filter(
+        ~QualifyingSession.driver_id.in_([d.id for d in team_drivers])
+    ).all()
+    
+    if orphan_choices:
+        print(f"DEBUG: [ALERTA] {len(orphan_choices)} elecciones huerfanas encontradas")
+        for choice in orphan_choices:
+            driver = Driver.query.get(choice.driver_id)
+            driver_name = driver.name if driver else f"Piloto-{choice.driver_id}"
+            print(f"DEBUG: [Huerfana] Driver ID: {choice.driver_id} ({driver_name}), Tyre: {choice.tyre_choice}")
+    
+    # Lógica de preparación
+    total_drivers = len(team_drivers)
+    drivers_with_choices = len(existing_choices)
+    is_fully_prepared = drivers_with_choices == total_drivers
+    
+    print(f"DEBUG: Resumen final - Elecciones: {drivers_with_choices}/{total_drivers}, Preparado: {is_fully_prepared}")
+    
+    return render_template('qualifying.html', 
+                         race=race,
+                         qualifying_weather=qualifying_weather,
+                         existing_choices=existing_choices,
+                         is_fully_prepared=is_fully_prepared,
+                         team=current_user)
+    
+    # DEBUG: Verificar todas las elecciones en la base de datos para este equipo
+    all_choices = QualifyingSession.query.filter_by(
+        race_id=race_id,
+        team_id=current_user.id
+    ).all()
+    
+    print(f"DEBUG: Total elecciones en BD para equipo {current_user.id}: {len(all_choices)}")
+    for choice in all_choices:
+        driver_name = Driver.query.get(choice.driver_id).name if Driver.query.get(choice.driver_id) else "N/A"
+        print(f"DEBUG: - Eleccion BD: driver_id={choice.driver_id} ({driver_name}), tyre={choice.tyre_choice}")
+    
+    # CORREGIDO: Lógica de preparación
+    total_drivers = len(team_drivers)
+    drivers_with_choices = len(existing_choices)
+    is_fully_prepared = drivers_with_choices == total_drivers
+    
+    print(f"DEBUG: Resumen - {drivers_with_choices}/{total_drivers} pilotos preparados, Completamente preparado: {is_fully_prepared}")
+    
+    return render_template('qualifying.html', 
+                         race=race,
+                         qualifying_weather=qualifying_weather,
+                         existing_choices=existing_choices,
+                         is_fully_prepared=is_fully_prepared,
+                         team=current_user)
+
+@app.route('/api/qualifying/tyre_choice', methods=['POST'])
+@login_required
+def set_qualifying_tyre():
+    """API para elegir neumáticos de clasificación"""
+    try:
+        data = request.get_json()
+        race_id = data.get('race_id')
+        driver_id = data.get('driver_id')
+        tyre_choice = data.get('tyre_choice')
+        strategy = data.get('strategy', 'balanced')
+        
+        print(f"DEBUG: Recibiendo eleccion - race_id: {race_id}, driver_id: {driver_id}, tyre: {tyre_choice}")
+        
+        # Validaciones
+        if not all([race_id, driver_id, tyre_choice]):
+            return jsonify({'success': False, 'message': 'Datos incompletos'})
+        
+        # Verificar que el piloto pertenece al equipo
+        driver = Driver.query.filter_by(id=driver_id, team_id=current_user.id).first()
+        if not driver:
+            print(f"DEBUG: ERROR - Piloto {driver_id} no pertenece al equipo {current_user.id}")
+            return jsonify({'success': False, 'message': 'Piloto no válido'})
+        
+        # Verificar neumático válido
+        valid_tyres = ['soft', 'medium', 'hard', 'wet', 'extreme_wet']
+        if tyre_choice not in valid_tyres:
+            return jsonify({'success': False, 'message': 'Neumático no válido'})
+        
+        # Verificar si ya existe una elección
+        existing = QualifyingSession.query.filter_by(
+            race_id=race_id,
+            team_id=current_user.id,
+            driver_id=driver_id
+        ).first()
+        
+        if existing:
+            # Actualizar elección existente
+            existing.tyre_choice = tyre_choice
+            action = "actualizada"
+            print(f"DEBUG: Eleccion actualizada para piloto {driver_id}")
+        else:
+            # Crear nueva elección
+            qualifying = QualifyingSession(
+                race_id=race_id,
+                team_id=current_user.id,
+                driver_id=driver_id,
+                tyre_choice=tyre_choice
+            )
+            db.session.add(qualifying)
+            action = "guardada"
+            print(f"DEBUG: Nueva eleccion creada para piloto {driver_id}")
+        
+        db.session.commit()
+        print(f"DEBUG: Eleccion {action} exitosamente para piloto {driver_id}")
+        
+        return jsonify({
+            'success': True, 
+            'message': f'Neumáticos {tyre_choice} seleccionados para la clasificación'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERROR: {str(e)}")
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'})
+        
+@app.route('/debug/qualifying_detailed/<int:race_id>')
+@login_required
+def debug_qualifying_detailed(race_id):
+    """Diagnóstico detallado del problema"""
+    team_drivers = current_user.drivers
+    all_choices = QualifyingSession.query.filter_by(
+        race_id=race_id,
+        team_id=current_user.id
+    ).all()
+    
+    # Diagnóstico detallado
+    diagnostic = {
+        'team': {
+            'id': current_user.id,
+            'name': current_user.team_name,
+            'drivers': []
+        },
+        'choices_in_db': [],
+        'matching_analysis': []
+    }
+    
+    # Información de los pilotos del equipo
+    for driver in team_drivers:
+        diagnostic['team']['drivers'].append({
+            'id': driver.id,
+            'name': driver.name
+        })
+    
+    # Información de las elecciones en BD
+    for choice in all_choices:
+        driver = Driver.query.get(choice.driver_id)
+        diagnostic['choices_in_db'].append({
+            'choice_id': choice.id,
+            'driver_id': choice.driver_id,
+            'driver_name': driver.name if driver else 'N/A',
+            'tyre_choice': choice.tyre_choice,
+            'team_id': choice.team_id
+        })
+    
+    # Análisis de matching
+    for driver in team_drivers:
+        choice = QualifyingSession.query.filter_by(
+            race_id=race_id,
+            team_id=current_user.id,
+            driver_id=driver.id
+        ).first()
+        
+        diagnostic['matching_analysis'].append({
+            'driver_id': driver.id,
+            'driver_name': driver.name,
+            'has_choice': choice is not None,
+            'choice_tyre': choice.tyre_choice if choice else None,
+            'choice_driver_id': choice.driver_id if choice else None
+        })
+    
+    return jsonify(diagnostic)
+        
+@app.route('/api/qualifying/clear_choices', methods=['POST'])
+@login_required
+def clear_qualifying_choices():
+    """API para limpiar todas las elecciones de neumáticos del equipo"""
+    try:
+        data = request.get_json()
+        race_id = data.get('race_id')
+        
+        if not race_id:
+            return jsonify({'success': False, 'message': 'ID de carrera no proporcionado'})
+        
+        # DEBUG: Verificar qué se va a eliminar
+        choices_to_delete = QualifyingSession.query.filter_by(
+            race_id=race_id,
+            team_id=current_user.id
+        ).all()
+        
+        print(f"DEBUG: Eliminando {len(choices_to_delete)} elecciones para equipo {current_user.id}")
+        for choice in choices_to_delete:
+            driver_name = Driver.query.get(choice.driver_id).name if Driver.query.get(choice.driver_id) else "N/A"
+            print(f"DEBUG: - Eliminando: {driver_name} ({choice.tyre_choice})")
+        
+        # Eliminar todas las elecciones del equipo para esta carrera
+        deleted_count = QualifyingSession.query.filter_by(
+            race_id=race_id,
+            team_id=current_user.id
+        ).delete()
+        
+        db.session.commit()
+        
+        print(f"DEBUG: {deleted_count} elecciones eliminadas para el equipo {current_user.id}")
+        
+        return jsonify({
+            'success': True, 
+            'message': f'{deleted_count} elecciones de neumáticos eliminadas'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERROR al limpiar elecciones: {str(e)}")
+        return jsonify({'success': False, 'message': f'Error al limpiar elecciones: {str(e)}'})
+        
+@app.route('/api/qualifying/clear_driver_choice', methods=['POST'])
+@login_required
+def clear_driver_qualifying_choice():
+    """API para limpiar la elección de neumáticos de un piloto específico"""
+    try:
+        data = request.get_json()
+        race_id = data.get('race_id')
+        driver_id = data.get('driver_id')
+        
+        if not all([race_id, driver_id]):
+            return jsonify({'success': False, 'message': 'Datos incompletos'})
+        
+        # Verificar que el piloto pertenece al equipo
+        driver = Driver.query.filter_by(id=driver_id, team_id=current_user.id).first()
+        if not driver:
+            return jsonify({'success': False, 'message': 'Piloto no válido'})
+        
+        # Eliminar la elección específica
+        deleted_count = QualifyingSession.query.filter_by(
+            race_id=race_id,
+            team_id=current_user.id,
+            driver_id=driver_id
+        ).delete()
+        
+        db.session.commit()
+        
+        driver_name = driver.name
+        print(f"DEBUG: Elección eliminada para piloto {driver_id} ({driver_name})")
+        
+        return jsonify({
+            'success': True, 
+            'message': f'Elección eliminada para {driver_name}'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERROR al limpiar elección individual: {str(e)}")
+        return jsonify({'success': False, 'message': f'Error al eliminar elección: {str(e)}'})
+
+@app.route('/simulate_qualifying/<int:race_id>')
+@login_required
+def simulate_qualifying(race_id):
+    """Simular la sesión de clasificación"""
+    try:
+        # Obtener todas las elecciones de neumáticos
+        qualifying_choices = QualifyingSession.query.filter_by(race_id=race_id).all()
+        
+        if not qualifying_choices:
+            return jsonify({'success': False, 'message': 'No hay equipos preparados para la clasificación'})
+        
+        # Obtener pronóstico meteorológico
+        weather = WeatherForecast.query.filter_by(
+            race_id=race_id, 
+            session_type='qualifying'
+        ).first()
+        
+        # Simular Q1, Q2, Q3
+        results = simulate_qualifying_session(qualifying_choices, weather)
+        
+        # Guardar resultados
+        for result in results:
+            qualifying = QualifyingSession.query.filter_by(
+                race_id=race_id,
+                team_id=result['team_id'],
+                driver_id=result['driver_id']
+            ).first()
+            
+            if qualifying:
+                qualifying.q1_time = result['q1_time']
+                qualifying.q2_time = result.get('q2_time')
+                qualifying.q3_time = result.get('q3_time')
+                qualifying.final_position = result['final_position']
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Clasificación simulada exitosamente',
+            'results': results
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Error en la simulación: {str(e)}'})
+
+def simulate_qualifying_session(qualifying_choices, weather):
+    """Simula las tres partes de la clasificación"""
+    results = []
+    
+    # Simular Q1 - Todos los pilotos
+    q1_results = []
+    for choice in qualifying_choices:
+        base_time = calculate_base_qualifying_time(choice.driver, choice.team, choice.tyre_choice, weather)
+        q1_time = apply_weather_effects(base_time, choice.tyre_choice, weather)
+        q1_results.append({
+            'team_id': choice.team_id,
+            'driver_id': choice.driver_id,
+            'driver_name': choice.driver.name,
+            'team_name': choice.team.team_name,
+            'tyre_choice': choice.tyre_choice,
+            'q1_time': q1_time
+        })
+    
+    # Ordenar Q1 y eliminar los más lentos (top 15 pasan a Q2)
+    q1_results.sort(key=lambda x: x['q1_time'])
+    q2_participants = q1_results[:15]
+    
+    # Simular Q2
+    for participant in q2_participants:
+        base_time = calculate_base_qualifying_time(
+            Driver.query.get(participant['driver_id']),
+            User.query.get(participant['team_id']),
+            participant['tyre_choice'],
+            weather
+        )
+        q2_time = apply_weather_effects(base_time, participant['tyre_choice'], weather)
+        participant['q2_time'] = q2_time
+    
+    # Ordenar Q2 y eliminar los más lentos (top 10 pasan a Q3)
+    q2_participants.sort(key=lambda x: x['q2_time'])
+    q3_participants = q2_participants[:10]
+    
+    # Simular Q3
+    for participant in q3_participants:
+        base_time = calculate_base_qualifying_time(
+            Driver.query.get(participant['driver_id']),
+            User.query.get(participant['team_id']),
+            participant['tyre_choice'],
+            weather
+        )
+        q3_time = apply_weather_effects(base_time, participant['tyre_choice'], weather)
+        participant['q3_time'] = q3_time
+    
+    # Ordenar final por Q3 (o Q2 si no hay Q3)
+    q3_participants.sort(key=lambda x: x.get('q3_time', x['q2_time']))
+    
+    # Asignar posiciones finales
+    for i, participant in enumerate(q3_participants):
+        participant['final_position'] = i + 1
+    
+    # Combinar todos los resultados
+    all_participants = q3_participants + [p for p in q1_results if p not in q3_participants]
+    for i, participant in enumerate(all_participants):
+        if 'final_position' not in participant:
+            participant['final_position'] = i + 1
+    
+    return all_participants
+
+def calculate_base_qualifying_time(driver, team, tyre_choice, weather):
+    """Calcula el tiempo base para una vuelta de clasificación"""
+    # Tiempo base según circuito (aproximado)
+    base_time = 85.0  # 1:25.000 como referencia
+    
+    # Efecto del piloto
+    driver_skill = (driver.skill + driver.experience) / 2
+    driver_effect = (100 - driver_skill) / 200  # Mejor piloto = menos tiempo
+    
+    # Efecto del coche
+    car_performance = sum(comp.strength for comp in team.car_components) / 4
+    car_effect = (100 - car_performance) / 150
+    
+    # Efecto del neumático
+    tyre_effects = {
+        'soft': -2.0,    # Más rápido
+        'medium': -1.0,  # Intermedio
+        'hard': 0.0,     # Neutral
+        'wet': 8.0,      # Más lento en seco
+        'extreme_wet': 12.0  # Mucho más lento en seco
+    }
+    tyre_effect = tyre_effects.get(tyre_choice, 0.0)
+    
+    # Ajustar neumático según condiciones
+    if weather and weather.condition != 'dry':
+        if weather.condition == 'light_rain':
+            if tyre_choice in ['soft', 'medium', 'hard']:
+                tyre_effect += 15.0  # Muy lento con neumáticos de seco en lluvia
+            elif tyre_choice == 'wet':
+                tyre_effect = 2.0    # Bueno para lluvia ligera
+            else:  # extreme_wet
+                tyre_effect = 4.0    # Demasiado conservador
+        elif weather.condition == 'heavy_rain':
+            if tyre_choice in ['soft', 'medium', 'hard']:
+                tyre_effect += 25.0  # Extremadamente lento/peligroso
+            elif tyre_choice == 'wet':
+                tyre_effect += 8.0   # Riesgoso en lluvia intensa
+            else:  # extreme_wet
+                tyre_effect = 3.0    # Ideal para lluvia intensa
+    
+    # Factor aleatorio
+    random_factor = random.uniform(-0.5, 0.5)
+    
+    # Cálculo final
+    final_time = base_time - driver_effect - car_effect + tyre_effect + random_factor
+    return round(final_time, 3)
+
+def apply_weather_effects(base_time, tyre_choice, weather):
+    """Aplica efectos meteorológicos adicionales"""
+    if not weather:
+        return base_time
+    
+    time_penalty = 0
+    
+    # Penalizaciones por neumático incorrecto
+    if weather.condition == 'light_rain' and tyre_choice in ['soft', 'medium', 'hard']:
+        time_penalty += random.uniform(2.0, 5.0)  # Alta penalización
+    elif weather.condition == 'heavy_rain' and tyre_choice != 'extreme_wet':
+        time_penalty += random.uniform(5.0, 10.0) # Penalización muy alta
+    
+    # Variabilidad por condiciones
+    if weather.condition != 'dry':
+        variability = random.uniform(-1.0, 3.0)
+        time_penalty += variability
+    
+    return round(base_time + time_penalty, 3)
+    
+@app.route('/qualifying_results/<int:race_id>')
+@login_required
+def qualifying_results(race_id):
+    """Página de resultados de clasificación"""
+    race = Race.query.get_or_404(race_id)
+    results = QualifyingSession.query.filter_by(race_id=race_id).order_by(
+        QualifyingSession.final_position.asc()
+    ).all()
+    
+    return render_template('qualifying_results.html', 
+                         race=race, 
+                         results=results)
 
 # Funciones auxiliares para la simulación de tests
 def simulate_test_laps(driver, initial_tyre, total_laps, track_condition):
