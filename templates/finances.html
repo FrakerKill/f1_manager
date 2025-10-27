@@ -1,0 +1,412 @@
+{% extends "base.html" %}
+
+{% block title %}Finanzas - {{ current_user.team_name }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1>💰 Finanzas - {{ current_user.team_name }}</h1>
+        
+        <!-- Resumen Financiero -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card text-white bg-success">
+                    <div class="card-body text-center">
+                        <h4>€{{ "{:,.0f}".format(current_user.money) }}</h4>
+                        <small>Saldo Actual</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-white bg-info">
+                    <div class="card-body text-center">
+                        <h4>€{{ "{:,.0f}".format(total_income) }}</h4>
+                        <small>Ingresos Totales</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-white bg-danger">
+                    <div class="card-body text-center">
+                        <h4>€{{ "{:,.0f}".format(total_expenses) }}</h4>
+                        <small>Gastos Totales</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card {% if net_balance >= 0 %}bg-warning text-dark{% else %}bg-dark text-white{% endif %}">
+                    <div class="card-body text-center">
+                        <h4>€{{ "{:,.0f}".format(net_balance) }}</h4>
+                        <small>Balance Neto</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Gráficos y Estadísticas -->
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">📊 Resumen Financiero</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Gastos Mensuales en Salarios</h6>
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <h4 class="text-danger">€{{ "{:,.0f}".format(monthly_salary_cost) }}</h4>
+                                        <small>Total mensual en nóminas</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Desglose de Personal</h6>
+                                <ul class="list-group">
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Pilotos
+                                        <span class="badge bg-primary rounded-pill">{{ current_user.drivers|length }}</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Mecánicos
+                                        <span class="badge bg-primary rounded-pill">{{ current_user.mechanics|length }}</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Ingenieros
+                                        <span class="badge bg-primary rounded-pill">{{ current_user.engineers|length }}</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <!-- Gráficos -->
+                        <div class="row mt-4">
+                            <div class="col-md-12">
+                                <div id="financeCharts">
+                                    <div class="text-center">
+                                        <p class="text-muted">Los gráficos se cargarán automáticamente</p>
+                                        <div class="spinner-border" role="status">
+                                            <span class="visually-hidden">Cargando...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transacciones Recientes -->
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">💳 Transacciones Recientes</h5>
+                        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#filtersModal">
+                            Filtrar
+                        </button>
+                    </div>
+                    <div class="card-body" style="max-height: 600px; overflow-y: auto;">
+                        <div id="transactionsList">
+                            {% for transaction in transactions %}
+                            <div class="transaction-item mb-3 p-2 border rounded {% if transaction.transaction_type == 'income' %}border-success{% else %}border-danger{% endif %}">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <strong class="{% if transaction.transaction_type == 'income' %}text-success{% else %}text-danger{% endif %}">
+                                            {{ transaction.description }}
+                                        </strong>
+                                        <br>
+                                        <small class="text-muted">
+                                            {{ transaction.category|replace('_', ' ')|title }}
+                                        </small>
+                                        <br>
+                                        <small class="text-muted">
+                                            {{ transaction.created_at.strftime('%d/%m/%Y %H:%M') }}
+                                        </small>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="{% if transaction.transaction_type == 'income' %}text-success{% else %}text-danger{% endif %}">
+                                            {% if transaction.transaction_type == 'income' %}+{% else %}-{% endif %}€{{ "{:,.0f}".format(transaction.amount) }}
+                                        </span>
+                                        <br>
+                                        <small class="text-muted">
+                                            Saldo: €{{ "{:,.0f}".format(transaction.balance_after) }}
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            {% else %}
+                            <div class="text-center text-muted py-4">
+                                <p>No hay transacciones registradas</p>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        
+                        <!-- Paginación -->
+                        <div id="pagination" class="mt-3 text-center">
+                            <!-- La paginación se cargará via JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Filtros -->
+<div class="modal fade" id="filtersModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Filtrar Transacciones</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Tipo de Transacción</label>
+                    <select class="form-select" id="filterType">
+                        <option value="all">Todos</option>
+                        <option value="income">Ingresos</option>
+                        <option value="expense">Gastos</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Categoría</label>
+                    <select class="form-select" id="filterCategory">
+                        <option value="all">Todas</option>
+                        <option value="salary_advance">Adelanto Salarial</option>
+                        <option value="upgrade">Mejoras</option>
+                        <option value="training">Entrenamientos</option>
+                        <option value="race_prize">Premios Carrera</option>
+                        <option value="sponsorship">Patrocinios</option>
+                    </select>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <label class="form-label">Fecha Desde</label>
+                        <input type="date" class="form-control" id="filterStartDate">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Fecha Hasta</label>
+                        <input type="date" class="form-control" id="filterEndDate">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="applyFilters()">Aplicar Filtros</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.transaction-item {
+    background: #f8f9fa;
+    transition: all 0.3s ease;
+}
+
+.transaction-item:hover {
+    background: #e9ecef;
+    transform: translateX(5px);
+}
+
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+</style>
+
+<script>
+let currentPage = 1;
+let currentFilters = {};
+
+// Cargar transacciones via AJAX
+function loadTransactions(page = 1) {
+    const params = new URLSearchParams({
+        page: page,
+        ...currentFilters
+    });
+    
+    fetch(`/api/finances/transactions?${params}`)
+        .then(response => response.json())
+        .then(data => {
+            displayTransactions(data.transactions);
+            updatePagination(data);
+            currentPage = page;
+        });
+}
+
+// Mostrar transacciones
+function displayTransactions(transactions) {
+    const container = document.getElementById('transactionsList');
+    
+    if (transactions.length === 0) {
+        container.innerHTML = `
+            <div class="text-center text-muted py-4">
+                <p>No se encontraron transacciones</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = transactions.map(transaction => `
+        <div class="transaction-item mb-3 p-2 border rounded ${transaction.type === 'income' ? 'border-success' : 'border-danger'}">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <strong class="${transaction.type === 'income' ? 'text-success' : 'text-danger'}">
+                        ${transaction.description}
+                    </strong>
+                    <br>
+                    <small class="text-muted">
+                        ${transaction.category.replace('_', ' ').toUpperCase()}
+                    </small>
+                    <br>
+                    <small class="text-muted">
+                        ${transaction.date}
+                    </small>
+                </div>
+                <div class="text-end">
+                    <span class="${transaction.type === 'income' ? 'text-success' : 'text-danger'}">
+                        ${transaction.type === 'income' ? '+' : '-'}€${transaction.amount.toLocaleString('es-ES', {maximumFractionDigits: 0})}
+                    </span>
+                    <br>
+                    <small class="text-muted">
+                        Saldo: €${transaction.balance_after.toLocaleString('es-ES', {maximumFractionDigits: 0})}
+                    </small>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Actualizar paginación
+function updatePagination(data) {
+    const pagination = document.getElementById('pagination');
+    
+    if (data.total_pages <= 1) {
+        pagination.innerHTML = '';
+        return;
+    }
+    
+    let html = '<nav><ul class="pagination justify-content-center">';
+    
+    // Botón anterior
+    if (data.has_prev) {
+        html += `<li class="page-item"><a class="page-link" href="#" onclick="loadTransactions(${currentPage - 1})">Anterior</a></li>`;
+    }
+    
+    // Números de página
+    for (let i = 1; i <= data.total_pages; i++) {
+        html += `
+            <li class="page-item ${i === currentPage ? 'active' : ''}">
+                <a class="page-link" href="#" onclick="loadTransactions(${i})">${i}</a>
+            </li>
+        `;
+    }
+    
+    // Botón siguiente
+    if (data.has_next) {
+        html += `<li class="page-item"><a class="page-link" href="#" onclick="loadTransactions(${currentPage + 1})">Siguiente</a></li>`;
+    }
+    
+    html += '</ul></nav>';
+    pagination.innerHTML = html;
+}
+
+// Aplicar filtros
+function applyFilters() {
+    currentFilters = {
+        type: document.getElementById('filterType').value,
+        category: document.getElementById('filterCategory').value,
+        start_date: document.getElementById('filterStartDate').value,
+        end_date: document.getElementById('filterEndDate').value
+    };
+    
+    // Eliminar filtros vacíos
+    Object.keys(currentFilters).forEach(key => {
+        if (!currentFilters[key] || currentFilters[key] === 'all') {
+            delete currentFilters[key];
+        }
+    });
+    
+    loadTransactions(1);
+    $('#filtersModal').modal('hide');
+}
+
+// Cargar gráficos
+function loadCharts() {
+    fetch('/api/finances/stats')
+        .then(response => response.json())
+        .then(data => {
+            renderCharts(data);
+        });
+}
+
+// Renderizar gráficos (implementación básica)
+function renderCharts(data) {
+    const container = document.getElementById('financeCharts');
+    
+    // Aquí puedes integrar Chart.js o cualquier otra librería de gráficos
+    // Por ahora mostraremos los datos en formato tabla
+    container.innerHTML = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Evolución Mensual</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Mes</th>
+                                <th>Ingresos</th>
+                                <th>Gastos</th>
+                                <th>Balance</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.monthly_stats.map(stat => `
+                                <tr>
+                                    <td>${stat.month}</td>
+                                    <td class="text-success">€${stat.income.toLocaleString('es-ES', {maximumFractionDigits: 0})}</td>
+                                    <td class="text-danger">€${stat.expenses.toLocaleString('es-ES', {maximumFractionDigits: 0})}</td>
+                                    <td class="${stat.income - stat.expenses >= 0 ? 'text-success' : 'text-danger'}">
+                                        €${(stat.income - stat.expenses).toLocaleString('es-ES', {maximumFractionDigits: 0})}
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <h6>Gastos por Categoría (Último Mes)</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Categoría</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.category_stats.map(stat => `
+                                <tr>
+                                    <td>${stat.category.replace('_', ' ').toUpperCase()}</td>
+                                    <td class="text-danger">€${stat.total.toLocaleString('es-ES', {maximumFractionDigits: 0})}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Inicializar cuando se carga la página
+document.addEventListener('DOMContentLoaded', function() {
+    loadTransactions();
+    loadCharts();
+});
+</script>
+{% endblock %}
