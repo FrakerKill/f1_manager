@@ -1,178 +1,33 @@
+# init_db.py
 from app import app, db, Driver, Mechanic, Engineer, Circuit, Race, CarComponent, TyreType, WeatherForecast, WeatherChange, Upgrade, Training, ChampionshipStandings
 from datetime import datetime, timedelta
 import random
 import os
 from werkzeug.security import generate_password_hash
 
-def generate_random_name():
-    """Genera nombres aleatorios para pilotos, mecánicos e ingenieros"""
-    first_names = [
-        'Carlos', 'Fernando', 'Lewis', 'Max', 'Charles', 'Lando', 'George', 'Sergio',
-        'Esteban', 'Pierre', 'Valtteri', 'Kevin', 'Daniel', 'Sebastian', 'Kimi', 'Nico',
-        'Alex', 'Yuki', 'Zhou', 'Nicholas', 'Mick', 'Lance', 'Antonio', 'Romain',
-        'Marcus', 'Robert', 'Jenson', 'Felipe', 'Rubens', 'Giancarlo', 'Heikki', 'Jarno',
-        'Mark', 'David', 'Adrian', 'Pastor', 'Bruno', 'Kamui', 'Vitaly', 'Jaime'
-    ]
-    
-    last_names = [
-        'Sainz', 'Alonso', 'Hamilton', 'Verstappen', 'Leclerc', 'Norris', 'Russell', 'Pérez',
-        'Ocon', 'Gasly', 'Bottas', 'Magnussen', 'Ricciardo', 'Vettel', 'Räikkönen', 'Hülkenberg',
-        'Albon', 'Tsunoda', 'Guanyu', 'Latifi', 'Schumacher', 'Stroll', 'Giovinazzi', 'Grosjean',
-        'Ericsson', 'Kubica', 'Button', 'Massa', 'Barrichello', 'Fisichella', 'Kovalainen', 'Trulli',
-        'Webber', 'Coulthard', 'Sutil', 'Maldonado', 'Senna', 'Kobayashi', 'Petrov', 'Alguersuari'
-    ]
-    
-    return f"{random.choice(first_names)} {random.choice(last_names)}"
+# ELIMINAR las siguientes funciones de init_db.py (ya están en staff_generator.py):
+# - generate_random_name()
+# - generate_mechanic_name() 
+# - generate_engineer_name()
+# - calculate_driver_salary()
+# - calculate_mechanic_salary()
+# - calculate_engineer_salary()
 
-def generate_mechanic_name():
-    """Genera nombres aleatorios para mecánicos"""
-    first_names = [
-        'John', 'Mike', 'David', 'Chris', 'Paul', 'Mark', 'James', 'Robert',
-        'Steve', 'Kevin', 'Brian', 'Jason', 'Eric', 'Scott', 'Jeff', 'Tim',
-        'Richard', 'Daniel', 'Patrick', 'Anthony', 'Steven', 'Thomas', 'Ryan',
-        'Matthew', 'Andrew', 'Joshua', 'Justin', 'Jonathan', 'Nicholas', 'Benjamin'
-    ]
-    
-    last_names = [
-        'Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis',
-        'Rodriguez', 'Martinez', 'Hernandez', 'Lopez', 'Gonzalez', 'Wilson', 'Anderson',
-        'Thomas', 'Taylor', 'Moore', 'Jackson', 'Martin', 'Lee', 'Perez', 'Thompson',
-        'White', 'Harris', 'Sanchez', 'Clark', 'Ramirez', 'Lewis', 'Robinson'
-    ]
-    
-    return f"{random.choice(first_names)} {random.choice(last_names)}"
-
-def generate_engineer_name():
-    """Genera nombres aleatorios para ingenieros"""
-    first_names = [
-        'Alexander', 'Benjamin', 'Christopher', 'Dominic', 'Edward', 'Frederick', 'Gregory',
-        'Harrison', 'Isaac', 'Jonathan', 'Kenneth', 'Lawrence', 'Maxwell', 'Nathaniel',
-        'Oliver', 'Patrick', 'Quentin', 'Reginald', 'Sebastian', 'Theodore', 'Victor',
-        'William', 'Xavier', 'Zachary', 'Adrian', 'Benedict', 'Cedric', 'Desmond'
-    ]
-    
-    last_names = [
-        'Anderson', 'Bennett', 'Carter', 'Davidson', 'Edwards', 'Fitzgerald', 'Grayson',
-        'Harrington', 'Ingram', 'Jefferson', 'Kensington', 'Livingston', 'Montgomery',
-        'Norton', 'Oswald', 'Pembroke', 'Quinn', 'Rutherford', 'Sutherland', 'Thornton',
-        'Underwood', 'Vance', 'Whitaker', 'Xavier', 'Yates', 'Zimmerman', 'Arlington',
-        'Blackwood'
-    ]
-    
-    return f"{random.choice(first_names)} {random.choice(last_names)}"
-
-def calculate_driver_salary(age, skill, experience, aggression, consistency, growth_potential):
-    """Calcula el salario del piloto basado en sus atributos"""
-    # Base salary por ser piloto de F1
-    base_salary = 500000
-    
-    # Factores de ajuste
-    age_factor = 1.0
-    if age <= 25:
-        age_factor = 0.7  # Jóvenes ganan menos
-    elif age <= 30:
-        age_factor = 1.0  # Edad óptima
-    elif age <= 35:
-        age_factor = 1.2  # Experimentados
-    else:
-        age_factor = 1.5  # Veteranos muy valorados
-    
-    # Habilidad y experiencia son los factores más importantes
-    skill_factor = skill / 50.0  # 50 es el promedio
-    experience_factor = experience / 50.0
-    
-    # Factores secundarios
-    consistency_factor = consistency / 50.0
-    growth_factor = growth_potential / 50.0
-    
-    # La agresión puede ser positiva o negativa dependiendo del nivel
-    aggression_factor = 1.0
-    if aggression < 50:
-        aggression_factor = 0.9  # Muy conservador
-    elif aggression > 80:
-        aggression_factor = 1.1  # Muy agresivo (arriesgado pero puede dar resultados)
-    
-    # Cálculo final del salario
-    salary = base_salary * age_factor * skill_factor * experience_factor * consistency_factor * growth_factor * aggression_factor
-    
-    # Ajustar rango razonable para pilotos de F1
-    salary = max(200000, min(15000000, salary))
-    
-    return int(salary)
-
-def calculate_mechanic_salary(age, pit_stop_skill, reliability_skill, growth_potential):
-    """Calcula el salario del mecánico basado en sus atributos"""
-    base_salary = 80000
-    
-    # Factores de ajuste
-    age_factor = 1.0
-    if age <= 30:
-        age_factor = 0.8  # Jóvenes ganan menos
-    elif age <= 45:
-        age_factor = 1.0  # Edad óptima
-    elif age <= 55:
-        age_factor = 1.3  # Experimentados muy valorados
-    else:
-        age_factor = 1.5  # Veteranos con mucha experiencia
-    
-    # Habilidades principales
-    pit_skill_factor = pit_stop_skill / 50.0
-    reliability_factor = reliability_skill / 50.0
-    growth_factor = growth_potential / 50.0
-    
-    # Cálculo final
-    salary = base_salary * age_factor * pit_skill_factor * reliability_factor * growth_factor
-    
-    # Ajustar rango razonable para mecánicos de F1
-    salary = max(50000, min(400000, salary))
-    
-    return int(salary)
-
-def calculate_engineer_salary(age, innovation, development_speed, growth_potential):
-    """Calcula el salario del ingeniero basado en sus atributos"""
-    base_salary = 120000
-    
-    # Factores de ajuste
-    age_factor = 1.0
-    if age <= 35:
-        age_factor = 0.8  # Jóvenes ganan menos
-    elif age <= 50:
-        age_factor = 1.0  # Edad óptima
-    elif age <= 65:
-        age_factor = 1.4  # Experimentados muy valorados
-    else:
-        age_factor = 1.6  # Veteranos con mucha experiencia
-    
-    # Habilidades principales
-    innovation_factor = innovation / 50.0
-    development_factor = development_speed / 50.0
-    growth_factor = growth_potential / 50.0
-    
-    # Cálculo final
-    salary = base_salary * age_factor * innovation_factor * development_factor * growth_factor
-    
-    # Ajustar rango razonable para ingenieros de F1
-    salary = max(80000, min(600000, salary))
-    
-    return int(salary)
+# Añadir import del nuevo módulo
+from staff_generator import generate_initial_staff, generate_random_name
 
 def init_car_components_base():
     """Inicializa componentes base del coche (para referencia de mejoras)"""
-    # Estos son los tipos de componentes que se crearán cuando un usuario se registre
     component_types = ['engine', 'aerodynamics', 'brakes', 'suspension']
     print(f"   - Tipos de componentes definidos: {component_types}")
     return component_types
 
 def init_upgrade_system():
     """Inicializa datos del sistema de mejoras"""
-    # No creamos mejoras iniciales, ya que los usuarios las crearán
-    # Pero verificamos que el modelo Upgrade esté disponible
     print("   - Sistema de mejoras configurado y listo")
 
 def init_training_system():
     """Inicializa datos del sistema de entrenamientos"""
-    # No creamos entrenamientos iniciales, ya que los usuarios los crearán
-    # Pero verificamos que el modelo Training esté disponible
     print("   - Sistema de entrenamientos configurado y listo")
 
 def init_tyres():
@@ -285,87 +140,8 @@ def init_database():
         
         # NO crear usuarios de ejemplo - el primer usuario se creará al registrarse
         
-        # Crear pilotos aleatorios (todos disponibles en el mercado)
-        print("Creando pilotos disponibles en el mercado...")
-        drivers = []
-        for i in range(20):  # Crear 20 pilotos aleatorios
-            age = random.randint(18, 39)
-            skill = random.randint(40, 95)
-            experience = random.randint(30, 90)
-            aggression = random.randint(40, 85)
-            consistency = random.randint(45, 95)
-            growth_potential = random.randint(50, 90)
-            
-            salary = calculate_driver_salary(age, skill, experience, aggression, consistency, growth_potential)
-            
-            driver = Driver(
-                name=generate_random_name(),
-                age=age,
-                salary=salary,
-                skill=skill,
-                experience=experience,
-                aggression=aggression,
-                consistency=consistency,
-                growth_potential=growth_potential,
-                market_available=True,
-                team_id=None  # Todos disponibles en el mercado
-            )
-            drivers.append(driver)
-            db.session.add(driver)
-        
-        # Crear mecánicos aleatorios (todos disponibles en el mercado)
-        print("Creando mecánicos disponibles en el mercado...")
-        for i in range(30):  # Crear 30 mecánicos aleatorios
-            # Variar las edades para tener algunos cerca de la jubilación
-            if i < 8:  # Algunos mecánicos mayores
-                age = random.randint(55, 65)
-            else:  # Mecánicos más jóvenes
-                age = random.randint(25, 54)
-            
-            pit_stop_skill = random.randint(50, 95)
-            reliability_skill = random.randint(50, 90)
-            growth_potential = random.randint(50, 85)
-            
-            salary = calculate_mechanic_salary(age, pit_stop_skill, reliability_skill, growth_potential)
-            
-            mechanic = Mechanic(
-                name=generate_mechanic_name(),
-                age=age,
-                salary=salary,
-                pit_stop_skill=pit_stop_skill,
-                reliability_skill=reliability_skill,
-                growth_potential=growth_potential,
-                market_available=True,
-                team_id=None  # Todos disponibles en el mercado
-            )
-            db.session.add(mechanic)
-        
-        # Crear ingenieros aleatorios (todos disponibles en el mercado)
-        print("Creando ingenieros disponibles en el mercado...")
-        for i in range(30):  # Crear 30 ingenieros aleatorios
-            # Variar las edades para tener algunos cerca de la jubilación
-            if i < 8:  # Algunos ingenieros mayores
-                age = random.randint(65, 75)
-            else:  # Ingenieros más jóvenes
-                age = random.randint(28, 64)
-            
-            innovation = random.randint(50, 95)
-            development_speed = random.randint(50, 90)
-            growth_potential = random.randint(50, 85)
-            
-            salary = calculate_engineer_salary(age, innovation, development_speed, growth_potential)
-            
-            engineer = Engineer(
-                name=generate_engineer_name(),
-                age=age,
-                salary=salary,
-                innovation=innovation,
-                development_speed=development_speed,
-                growth_potential=growth_potential,
-                market_available=True,
-                team_id=None  # Todos disponibles en el mercado
-            )
-            db.session.add(engineer)
+        # USAR EL MÓDULO EXTERNO para generar personal inicial
+        generate_initial_staff()
         
         # Crear circuitos del calendario 2025
         print("Creando circuitos...")
@@ -442,7 +218,8 @@ def init_database():
         
         db.session.commit()
         print("✅ Base de datos inicializada correctamente con calendario 2025!")
-        print(f"   - {len(drivers)} pilotos creados (todos disponibles en el mercado)")
+        print("   - Personal inicial generado usando staff_generator.py")
+        print(f"   - 20 pilotos creados (todos disponibles en el mercado)")
         print(f"   - 30 mecánicos creados (todos disponibles en el mercado)") 
         print(f"   - 30 ingenieros creados (todos disponibles en el mercado)")
         print(f"   - {len(circuits)} circuitos del calendario 2025 creados")

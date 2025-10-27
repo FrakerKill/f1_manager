@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for, s
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import json
 import random
 import math
@@ -38,6 +38,7 @@ class User(UserMixin, db.Model):
 class Driver(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
+    date_of_birth = db.Column(db.Date, nullable=False)
     age = db.Column(db.Integer, nullable=False)
     salary = db.Column(db.Float, nullable=False)
     skill = db.Column(db.Integer, default=50)
@@ -49,10 +50,20 @@ class Driver(db.Model):
     market_available = db.Column(db.Boolean, default=True)
     last_trained = db.Column(db.Date)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    @property
+    def is_retired(self):
+        """Verifica si el piloto debe jubilarse (más de 40 años)"""
+        today = date.today()
+        age = today.year - self.date_of_birth.year - (
+            (today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day)
+        )
+        return age >= 40
 
 class Mechanic(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
+    date_of_birth = db.Column(db.Date, nullable=False)
     age = db.Column(db.Integer, nullable=False)
     salary = db.Column(db.Float, nullable=False)
     pit_stop_skill = db.Column(db.Integer, default=50)
@@ -62,10 +73,20 @@ class Mechanic(db.Model):
     market_available = db.Column(db.Boolean, default=True)
     last_trained = db.Column(db.Date)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    @property
+    def is_retired(self):
+        """Verifica si el mecánico debe jubilarse (más de 65 años)"""
+        today = date.today()
+        age = today.year - self.date_of_birth.year - (
+            (today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day)
+        )
+        return age >= 65
 
 class Engineer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
+    date_of_birth = db.Column(db.Date, nullable=False)
     age = db.Column(db.Integer, nullable=False)
     salary = db.Column(db.Float, nullable=False)
     innovation = db.Column(db.Integer, default=50)
@@ -75,6 +96,15 @@ class Engineer(db.Model):
     market_available = db.Column(db.Boolean, default=True)
     last_trained = db.Column(db.Date)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    @property
+    def is_retired(self):
+        """Verifica si el ingeniero debe jubilarse (más de 70 años)"""
+        today = date.today()
+        age = today.year - self.date_of_birth.year - (
+            (today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day)
+        )
+        return age >= 70
 
 class CarComponent(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -278,6 +308,20 @@ class WeatherChange(db.Model):
     probability = db.Column(db.Float, nullable=False)  # 0-1
     
     race = db.relationship('Race', backref='weather_changes')
+
+class ChampionshipStandings(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    team_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    driver_id = db.Column(db.Integer, db.ForeignKey('driver.id'), nullable=False)
+    race_id = db.Column(db.Integer, db.ForeignKey('race.id'), nullable=False)
+    points = db.Column(db.Integer, default=0)
+    position = db.Column(db.Integer)
+    fastest_lap = db.Column(db.Boolean, default=False)
+    dnf = db.Column(db.Boolean, default=False)
+    
+    team = db.relationship('User', backref='championship_results')
+    driver = db.relationship('Driver', backref='championship_results')
+    race = db.relationship('Race', backref='championship_results')
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -549,20 +593,6 @@ class RaceSimulator:
         }
         return descriptions.get(event_type, f'{driver_name} tiene un incidente')
 
-class ChampionshipStandings(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    team_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    driver_id = db.Column(db.Integer, db.ForeignKey('driver.id'), nullable=False)
-    race_id = db.Column(db.Integer, db.ForeignKey('race.id'), nullable=False)
-    points = db.Column(db.Integer, default=0)
-    position = db.Column(db.Integer)
-    fastest_lap = db.Column(db.Boolean, default=False)
-    dnf = db.Column(db.Boolean, default=False)
-    
-    team = db.relationship('User', backref='championship_results')
-    driver = db.relationship('Driver', backref='championship_results')
-    race = db.relationship('Race', backref='championship_results')
-
 # Sistema de puntos F1 actual (desde 2022)
 POINTS_SYSTEM = {
     1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1
@@ -608,6 +638,10 @@ def register():
                 reliability=50
             )
             db.session.add(component)
+        
+        # GENERAR NUEVO PERSONAL usando el módulo externo
+        from staff_generator import generate_staff_batch
+        generate_staff_batch(drivers_count=4, mechanics_count=8, engineers_count=8)
         
         db.session.commit()
         
@@ -937,8 +971,6 @@ def complete_upgrade(upgrade_id):
     flash(f'¡Mejora completada! +{strength_improvement} fuerza, +{reliability_improvement} fiabilidad', 'success')
     return redirect(url_for('upgrades'))
 
-# Añadir después de las rutas de upgrades en app.py
-
 @app.route('/training')
 @login_required
 def training():
@@ -1156,7 +1188,44 @@ def scheduled_training_completion():
     with app.app_context():
         TrainingSystem.complete_trainings()
 
-#scheduler.add_job(scheduled_training_completion, 'interval', hours=1)
+# Añadir una ruta para forzar jubilaciones (para testing)
+@app.route('/admin/retire_staff')
+@login_required
+def admin_retire_staff():
+    """Ruta administrativa para forzar jubilaciones (solo para testing)"""
+    if current_user.username != 'admin':  # Solo permitir a un usuario admin
+        return jsonify({'success': False, 'message': 'No autorizado'})
+    
+    from staff_generator import handle_retirements
+    retired_count = handle_retirements()
+    return jsonify({'success': True, 'message': f'{retired_count} empleados jubilados'})
+
+# Actualizar el sistema programado para incluir jubilaciones
+def scheduled_retirement_check():
+    """Verificación programada de jubilaciones"""
+    with app.app_context():
+        from staff_generator import handle_retirements
+        retired_count = handle_retirements()
+        if retired_count > 0:
+            print(f"✅ {retired_count} empleados jubilados automáticamente y reemplazados")
+
+# Tareas programadas
+scheduler = BackgroundScheduler()
+
+# Configurar las tareas programadas
+scheduler.add_job(scheduled_training_completion, 'interval', hours=1)
+scheduler.add_job(scheduled_upgrade_completion, 'interval', hours=1)
+scheduler.add_job(scheduled_retirement_check, 'interval', hours=24)  # Verificar jubilaciones cada 24 horas
+
+def simulate_scheduled_races():
+    with app.app_context():
+        now = datetime.utcnow()
+        upcoming_races = Race.query.filter(Race.race_session <= now).all()
+        
+        for race in upcoming_races:
+            RaceSimulator.simulate_race(race.id)
+
+scheduler.add_job(simulate_scheduled_races, 'interval', minutes=30)
 
 @app.route('/calendar')
 @login_required
@@ -1712,160 +1781,6 @@ def get_next_tyre(current_tyre, track_condition):
         current_index = sequence.index(current_tyre)
         return sequence[(current_index + 1) % len(sequence)]
     return 'soft'
-
-# Funciones auxiliares para la simulación
-def get_wear_rate(tyre_type, track_condition):
-    base_rates = {
-        'soft': 6, 'medium': 4, 'hard': 2.5, 
-        'wet': 3, 'extreme_wet': 2
-    }
-    rate = base_rates.get(tyre_type, 4)
-    
-    if track_condition != 'dry' and tyre_type in ['soft', 'medium', 'hard']:
-        rate *= 1.5
-    
-    return rate
-
-def get_base_time(tyre_type, track_condition):
-    dry_times = {
-        'soft': 82, 'medium': 84, 'hard': 86, 
-        'wet': 95, 'extreme_wet': 98
-    }
-    base_time = dry_times.get(tyre_type, 84)
-    
-    if track_condition == 'light_rain':
-        if tyre_type in ['soft', 'medium', 'hard']:
-            base_time += 15
-        elif tyre_type == 'wet':
-            base_time += 2
-        else:
-            base_time += 5
-    elif track_condition == 'heavy_rain':
-        if tyre_type in ['soft', 'medium', 'hard']:
-            base_time += 25
-        elif tyre_type == 'wet':
-            base_time += 8
-        else:
-            base_time += 3
-    
-    return base_time
-
-def calculate_wear_penalty(tyre_wear, tyre_type):
-    if tyre_wear <= 50:
-        return 0
-    elif tyre_wear <= 80:
-        return (tyre_wear - 50) * 0.1
-    elif tyre_wear <= 100:
-        return 3 + (tyre_wear - 80) * 0.2
-    else:
-        return 7 + (tyre_wear - 100) * 0.3
-
-def is_wrong_tyre_for_conditions(tyre_type, track_condition):
-    if track_condition == 'dry':
-        return tyre_type in ['wet', 'extreme_wet']
-    elif track_condition == 'light_rain':
-        return tyre_type in ['soft', 'medium', 'hard']
-    elif track_condition == 'heavy_rain':
-        return tyre_type != 'extreme_wet'
-    return False
-
-def calculate_incident_chance(tyre_wear, driver_consistency, tyre_type, track_condition):
-    base_chance = 0
-    
-    if tyre_wear > 120:
-        base_chance = 40
-    elif tyre_wear > 100:
-        base_chance = 25
-    elif tyre_wear > 90:
-        base_chance = 15
-    elif tyre_wear > 80:
-        base_chance = 8
-    
-    if is_wrong_tyre_for_conditions(tyre_type, track_condition):
-        base_chance *= 3
-    
-    if tyre_type == 'soft':
-        base_chance *= 1.3
-    elif tyre_type == 'medium':
-        base_chance *= 1.1
-    
-    consistency_factor = (100 - driver_consistency) / 100
-    return base_chance * (1 + consistency_factor * 0.5)
-
-def generate_incident(tyre_wear, track_condition):
-    incidents = [
-        {'type': 'Trompo', 'severity': 'medium', 'base_time': 3},
-        {'type': 'Salida de pista', 'severity': 'low', 'base_time': 2},
-        {'type': 'Bloqueo de ruedas', 'severity': 'low', 'base_time': 1.5},
-        {'type': 'Pinchazo', 'severity': 'high', 'base_time': 15},
-        {'type': 'Pérdida de aerodinámica', 'severity': 'medium', 'base_time': 5}
-    ]
-    
-    if track_condition != 'dry':
-        incidents.extend([
-            {'type': 'Hidroplaneo', 'severity': 'high', 'base_time': 10},
-            {'type': 'Visibilidad cero', 'severity': 'medium', 'base_time': 6}
-        ])
-    
-    if tyre_wear > 100:
-        incidents = [i for i in incidents if i['severity'] != 'low']
-    if tyre_wear > 120:
-        incidents = [i for i in incidents if i['severity'] == 'high']
-    
-    return random.choice(incidents)
-
-def calculate_time_lost(incident):
-    return incident['base_time'] + random.random() * incident['base_time'] * 0.5
-
-def get_appropriate_tyre(track_condition):
-    if track_condition == 'dry':
-        return 'soft'
-    elif track_condition == 'light_rain':
-        return 'wet'
-    return 'extreme_wet'
-
-def get_max_wear(tyre_type):
-    max_wear = {
-        'soft': 120, 'medium': 130, 'hard': 140, 
-        'wet': 150, 'extreme_wet': 150
-    }
-    return max_wear.get(tyre_type, 120)
-
-def get_next_tyre(current_tyre, track_condition):
-    if track_condition != 'dry':
-        if current_tyre == 'wet':
-            return 'extreme_wet'
-        return 'wet'
-    
-    sequence = ['soft', 'medium', 'hard']
-    if current_tyre in sequence:
-        current_index = sequence.index(current_tyre)
-        return sequence[(current_index + 1) % len(sequence)]
-    return 'soft'
-
-# Tareas programadas
-scheduler = BackgroundScheduler()
-
-def scheduled_upgrade_completion():
-    with app.app_context():
-        UpgradeSystem.complete_upgrades()
-
-def simulate_scheduled_races():
-    with app.app_context():
-        now = datetime.utcnow()
-        upcoming_races = Race.query.filter(Race.race_session <= now).all()
-        
-        for race in upcoming_races:
-            RaceSimulator.simulate_race(race.id)
-
-def scheduled_training_completion():
-    with app.app_context():
-        TrainingSystem.complete_trainings()
-
-# MOVER ESTAS LÍNEAS AQUÍ, DESPUÉS DE DEFINIR EL SCHEDULER
-scheduler.add_job(scheduled_training_completion, 'interval', hours=1)
-scheduler.add_job(scheduled_upgrade_completion, 'interval', hours=1)
-scheduler.add_job(simulate_scheduled_races, 'interval', minutes=30)
 
 # Solo iniciar el scheduler si estamos ejecutando app.py directamente
 if __name__ == '__main__':
