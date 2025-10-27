@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+
+{% block title %}Mercado{% endblock %}
+
+{% block content %}
+<h1>Mercado de Transferencias</h1>
+
+<!-- Información de límites y presupuesto -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body py-3">
+                <div class="row text-center">
+                    <div class="col-md-3">
+                        <h4 class="text-primary">€{{ "{:,.0f}".format(current_user.money) }}</h4>
+                        <small class="text-muted">Presupuesto Actual</small>
+                    </div>
+                    <div class="col-md-3">
+                        <h4>{{ current_user.drivers|length }}/2</h4>
+                        <small class="text-muted">Pilotos</small>
+                    </div>
+                    <div class="col-md-3">
+                        <h4>{{ current_user.mechanics|length }}/4</h4>
+                        <small class="text-muted">Mecánicos</small>
+                    </div>
+                    <div class="col-md-3">
+                        <h4>{{ current_user.engineers|length }}/4</h4>
+                        <small class="text-muted">Ingenieros</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5>Pilotos Disponibles ({{ drivers|length }})</h5>
+            </div>
+            <div class="card-body">
+                {% for driver in drivers %}
+                <div class="market-item border rounded p-3 mb-2">
+                    <h6>{{ driver.name }}</h6>
+                    <p>
+                        Edad: {{ driver.age }} 
+                        {% if driver.age >= 35 %}<span class="badge bg-warning">Cerca de jubilar</span>{% endif %}
+                        {% if driver.age <= 25 %}<span class="badge bg-info">Joven</span>{% endif %}
+                        <br>
+                        Habilidad: {{ driver.skill }}<br>
+                        Experiencia: {{ driver.experience }}<br>
+                        Consistencia: {{ driver.consistency }}<br>
+                        <strong class="text-primary">Salario: €{{ "{:,.0f}".format(driver.salary) }}/carrera</strong>
+                    </p>
+                    <div class="value-indicator mb-2">
+                        {% set value_ratio = (driver.skill + driver.experience + driver.consistency) / driver.salary * 1000 %}
+                        <small class="text-muted">Relación valor: {{ "%.1f"|format(value_ratio) }}</small>
+                        <div class="progress" style="height: 5px;">
+                            <div class="progress-bar {% if value_ratio > 1.5 %}bg-success{% elif value_ratio > 1.0 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                 style="width: {{ [value_ratio * 50, 100]|min }}%"></div>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-primary buy-btn" 
+                            data-type="driver" 
+                            data-id="{{ driver.id }}"
+                            data-salary="{{ driver.salary }}"
+                            {% if current_user.drivers|length >= 2 %}disabled{% endif %}>
+                        Contratar - €{{ "{:,.0f}".format(driver.salary) }}
+                    </button>
+                </div>
+                {% else %}
+                <p class="text-muted">No hay pilotos disponibles</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5>Mecánicos Disponibles ({{ mechanics|length }})</h5>
+            </div>
+            <div class="card-body">
+                {% for mechanic in mechanics %}
+                <div class="market-item border rounded p-3 mb-2">
+                    <h6>{{ mechanic.name }}</h6>
+                    <p>
+                        Edad: {{ mechanic.age }} 
+                        {% if mechanic.age >= 55 %}<span class="badge bg-warning">Cerca de jubilar</span>{% endif %}
+                        {% if mechanic.age <= 30 %}<span class="badge bg-info">Joven</span>{% endif %}
+                        <br>
+                        Habilidad Boxes: {{ mechanic.pit_stop_skill }}<br>
+                        Fiabilidad: {{ mechanic.reliability_skill }}<br>
+                        <strong class="text-primary">Salario: €{{ "{:,.0f}".format(mechanic.salary) }}/carrera</strong>
+                    </p>
+                    <div class="value-indicator mb-2">
+                        {% set value_ratio = (mechanic.pit_stop_skill + mechanic.reliability_skill) / mechanic.salary * 1000 %}
+                        <small class="text-muted">Relación valor: {{ "%.1f"|format(value_ratio) }}</small>
+                        <div class="progress" style="height: 5px;">
+                            <div class="progress-bar {% if value_ratio > 1.5 %}bg-success{% elif value_ratio > 1.0 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                 style="width: {{ [value_ratio * 50, 100]|min }}%"></div>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-primary buy-btn" 
+                            data-type="mechanic" 
+                            data-id="{{ mechanic.id }}"
+                            data-salary="{{ mechanic.salary }}"
+                            {% if current_user.mechanics|length >= 4 %}disabled{% endif %}>
+                        Contratar - €{{ "{:,.0f}".format(mechanic.salary) }}
+                    </button>
+                </div>
+                {% else %}
+                <p class="text-muted">No hay mecánicos disponibles</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5>Ingenieros Disponibles ({{ engineers|length }})</h5>
+            </div>
+            <div class="card-body">
+                {% for engineer in engineers %}
+                <div class="market-item border rounded p-3 mb-2">
+                    <h6>{{ engineer.name }}</h6>
+                    <p>
+                        Edad: {{ engineer.age }} 
+                        {% if engineer.age >= 65 %}<span class="badge bg-warning">Cerca de jubilar</span>{% endif %}
+                        {% if engineer.age <= 35 %}<span class="badge bg-info">Joven</span>{% endif %}
+                        <br>
+                        Innovación: {{ engineer.innovation }}<br>
+                        Velocidad Desarrollo: {{ engineer.development_speed }}<br>
+                        <strong class="text-primary">Salario: €{{ "{:,.0f}".format(engineer.salary) }}/carrera</strong>
+                    </p>
+                    <div class="value-indicator mb-2">
+                        {% set value_ratio = (engineer.innovation + engineer.development_speed) / engineer.salary * 1000 %}
+                        <small class="text-muted">Relación valor: {{ "%.1f"|format(value_ratio) }}</small>
+                        <div class="progress" style="height: 5px;">
+                            <div class="progress-bar {% if value_ratio > 1.5 %}bg-success{% elif value_ratio > 1.0 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                 style="width: {{ [value_ratio * 50, 100]|min }}%"></div>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-primary buy-btn" 
+                            data-type="engineer" 
+                            data-id="{{ engineer.id }}"
+                            data-salary="{{ engineer.salary }}"
+                            {% if current_user.engineers|length >= 4 %}disabled{% endif %}>
+                        Contratar - €{{ "{:,.0f}".format(engineer.salary) }}
+                    </button>
+                </div>
+                {% else %}
+                <p class="text-muted">No hay ingenieros disponibles</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.buy-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const type = this.dataset.type;
+            const id = this.dataset.id;
+            const salary = parseFloat(this.dataset.salary);
+            const userMoney = {{ current_user.money }};
+            
+            // Verificar presupuesto antes de comprar
+            if (salary > userMoney) {
+                alert('No tienes suficiente presupuesto para esta contratación');
+                return;
+            }
+            
+            if (confirm(`¿Contratar por €${salary.toLocaleString()} por carrera?`)) {
+                fetch(`/buy/${type}/${id}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert(data.message);
+                            location.reload();
+                        } else {
+                            alert(data.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Error en la transacción');
+                    });
+            }
+        });
+    });
+});
+</script>
+
+<style>
+.value-indicator {
+    font-size: 0.8em;
+}
+.market-item {
+    background-color: #f8f9fa;
+    transition: transform 0.2s;
+}
+.market-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+</style>
+{% endblock %}

@@ -1,0 +1,1793 @@
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime, timedelta
+import json
+import random
+import math
+from apscheduler.schedulers.background import BackgroundScheduler
+import pytz
+from config import Config
+
+app = Flask(__name__)
+app.config.from_object(Config)
+db = SQLAlchemy(app)
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+# Modelos de la base de datos
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(120), nullable=False)
+    team_name = db.Column(db.String(100), nullable=False)
+    money = db.Column(db.Float, default=Config.STARTING_MONEY)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    drivers = db.relationship('Driver', backref='team', lazy=True)
+    mechanics = db.relationship('Mechanic', backref='team', lazy=True)
+    engineers = db.relationship('Engineer', backref='team', lazy=True)
+    car_components = db.relationship('CarComponent', backref='team', lazy=True)
+    test_sessions = db.relationship('TestSession', backref='team', lazy=True)
+    race_strategies = db.relationship('RaceStrategy', backref='team', lazy=True)
+
+class Driver(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    age = db.Column(db.Integer, nullable=False)
+    salary = db.Column(db.Float, nullable=False)
+    skill = db.Column(db.Integer, default=50)
+    experience = db.Column(db.Integer, default=50)
+    aggression = db.Column(db.Integer, default=50)
+    consistency = db.Column(db.Integer, default=50)
+    growth_potential = db.Column(db.Integer, default=50)
+    team_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    market_available = db.Column(db.Boolean, default=True)
+    last_trained = db.Column(db.Date)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class Mechanic(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    age = db.Column(db.Integer, nullable=False)
+    salary = db.Column(db.Float, nullable=False)
+    pit_stop_skill = db.Column(db.Integer, default=50)
+    reliability_skill = db.Column(db.Integer, default=50)
+    growth_potential = db.Column(db.Integer, default=50)
+    team_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    market_available = db.Column(db.Boolean, default=True)
+    last_trained = db.Column(db.Date)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class Engineer(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    age = db.Column(db.Integer, nullable=False)
+    salary = db.Column(db.Float, nullable=False)
+    innovation = db.Column(db.Integer, default=50)
+    development_speed = db.Column(db.Integer, default=50)
+    growth_potential = db.Column(db.Integer, default=50)
+    team_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    market_available = db.Column(db.Boolean, default=True)
+    last_trained = db.Column(db.Date)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class CarComponent(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    team_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    component_type = db.Column(db.String(20), nullable=False)
+    strength = db.Column(db.Integer, default=50)
+    reliability = db.Column(db.Integer, default=50)
+    upgrade_progress = db.Column(db.Integer, default=0)
+    upgrade_ends_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class Upgrade(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    team_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    component_type = db.Column(db.String(20), nullable=False)
+    level = db.Column(db.Integer, nullable=False)  # 1, 2, 3
+    weeks = db.Column(db.Integer, nullable=False)  # 1, 2, 3
+    total_cost = db.Column(db.Float, nullable=False)
+    start_date = db.Column(db.DateTime, nullable=False)
+    end_date = db.Column(db.DateTime, nullable=False)
+    completed = db.Column(db.Boolean, default=False)
+    
+    @property
+    def progress(self):
+        if self.completed:
+            return 100
+            
+        total_seconds = (self.end_date - self.start_date).total_seconds()
+        elapsed_seconds = (datetime.utcnow() - self.start_date).total_seconds()
+        
+        if total_seconds <= 0:
+            return 100
+            
+        progress = min(100, (elapsed_seconds / total_seconds) * 100)
+        return progress
+    
+    @property
+    def remaining_days(self):
+        if self.completed:
+            return 0
+            
+        remaining_seconds = (self.end_date - datetime.utcnow()).total_seconds()
+        remaining_days = max(0, remaining_seconds / (24 * 3600))
+        return int(remaining_days) + 1  # +1 para redondear hacia arriba
+        
+class Training(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    team_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    staff_type = db.Column(db.String(20), nullable=False)  # driver, mechanic, engineer
+    staff_id = db.Column(db.Integer, nullable=False)  # ID del piloto/mecánico/ingeniero
+    attribute = db.Column(db.String(30), nullable=False)  # atributo a mejorar
+    level = db.Column(db.Integer, nullable=False)  # 1, 2, 3
+    weeks = db.Column(db.Integer, nullable=False)  # 1, 2, 3
+    total_cost = db.Column(db.Float, nullable=False)
+    start_date = db.Column(db.DateTime, nullable=False)
+    end_date = db.Column(db.DateTime, nullable=False)
+    completed = db.Column(db.Boolean, default=False)
+    
+    @property
+    def progress(self):
+        if self.completed:
+            return 100
+            
+        total_seconds = (self.end_date - self.start_date).total_seconds()
+        elapsed_seconds = (datetime.utcnow() - self.start_date).total_seconds()
+        
+        if total_seconds <= 0:
+            return 100
+            
+        progress = min(100, (elapsed_seconds / total_seconds) * 100)
+        return progress
+    
+    @property
+    def remaining_days(self):
+        if self.completed:
+            return 0
+            
+        remaining_seconds = (self.end_date - datetime.utcnow()).total_seconds()
+        remaining_days = max(0, remaining_seconds / (24 * 3600))
+        return int(remaining_days) + 1  # +1 para redondear hacia arriba
+
+class Circuit(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    country = db.Column(db.String(50), nullable=False)
+    timezone = db.Column(db.String(50), nullable=False)
+    laps = db.Column(db.Integer, nullable=False)
+
+class Race(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    circuit_id = db.Column(db.Integer, db.ForeignKey('circuit.id'), nullable=False)
+    round_number = db.Column(db.Integer, nullable=False)
+    season_year = db.Column(db.Integer, nullable=False)
+    test_session = db.Column(db.DateTime, nullable=False)
+    qualifying_session = db.Column(db.DateTime, nullable=False)
+    sprint_session = db.Column(db.DateTime)
+    race_session = db.Column(db.DateTime, nullable=False)
+    
+    circuit = db.relationship('Circuit', backref='races')
+
+class RaceResult(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    race_id = db.Column(db.Integer, db.ForeignKey('race.id'), nullable=False)
+    team_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    driver_id = db.Column(db.Integer, db.ForeignKey('driver.id'), nullable=False)
+    position = db.Column(db.Integer)
+    points = db.Column(db.Integer, default=0)
+    tyre_usage = db.Column(db.Integer, default=0)
+    pit_stops = db.Column(db.Integer, default=0)
+    fastest_lap = db.Column(db.Boolean, default=False)
+    dnf = db.Column(db.Boolean, default=False)
+    dnf_reason = db.Column(db.String(50))
+
+class LiveEvent(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    race_id = db.Column(db.Integer, db.ForeignKey('race.id'), nullable=False)
+    team_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    driver_id = db.Column(db.Integer, db.ForeignKey('driver.id'), nullable=False)
+    lap = db.Column(db.Integer, nullable=False)
+    event_type = db.Column(db.String(50), nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+# Nuevos modelos para el sistema de tests
+class TyreType(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(20), nullable=False)  # soft, medium, hard, wet, extreme_wet
+    dry_performance = db.Column(db.Integer, nullable=False)
+    wet_performance = db.Column(db.Integer, nullable=False)
+    durability = db.Column(db.Integer, nullable=False)
+    warmup_time = db.Column(db.Integer, nullable=False)  # en segundos
+
+class TestSession(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    team_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    driver_id = db.Column(db.Integer, db.ForeignKey('driver.id'), nullable=False)
+    race_id = db.Column(db.Integer, db.ForeignKey('race.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relaciones
+    driver = db.relationship('Driver')
+    race = db.relationship('Race')
+
+class TestLap(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    test_session_id = db.Column(db.Integer, db.ForeignKey('test_session.id'), nullable=False)
+    lap_number = db.Column(db.Integer, nullable=False)
+    tyre_type = db.Column(db.String(20), nullable=False)
+    lap_time = db.Column(db.Float, nullable=False)  # tiempo en segundos
+    tyre_wear = db.Column(db.Integer, nullable=False)  # desgaste de 0-100
+    track_condition = db.Column(db.String(20), nullable=False)  # dry, wet, heavy_rain
+    
+    test_session = db.relationship('TestSession', backref='laps')
+
+class RaceStrategy(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    team_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    race_id = db.Column(db.Integer, db.ForeignKey('race.id'), nullable=False)
+    driver_id = db.Column(db.Integer, db.ForeignKey('driver.id'), nullable=False)
+    strategy_name = db.Column(db.String(100), nullable=False)
+    total_pit_stops = db.Column(db.Integer, nullable=False)
+    starting_tyre = db.Column(db.String(20), default='soft')
+    rain_strategy = db.Column(db.String(20), default='continue')  # continue, pit_wet, pit_extreme, next_pit
+    heavy_rain_strategy = db.Column(db.String(20), default='continue')  # continue, pit_extreme, immediate_pit
+    dry_strategy = db.Column(db.String(20), default='continue')  # continue, pit_soft, pit_medium, next_pit
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    driver = db.relationship('Driver')
+    race = db.relationship('Race')
+
+class StrategySegment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    strategy_id = db.Column(db.Integer, db.ForeignKey('race_strategy.id'), nullable=False)
+    segment_order = db.Column(db.Integer, nullable=False)
+    tyre_type = db.Column(db.String(20), nullable=False)
+    laps_planned = db.Column(db.Integer, nullable=False)
+    
+    strategy = db.relationship('RaceStrategy', backref='segments')
+    
+# Añadir después de los modelos existentes en app.py
+
+class WeatherForecast(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    race_id = db.Column(db.Integer, db.ForeignKey('race.id'), nullable=False)
+    session_type = db.Column(db.String(20), nullable=False)  # test, qualifying, race
+    forecast_time = db.Column(db.DateTime, nullable=False)
+    condition = db.Column(db.String(20), nullable=False)  # dry, light_rain, heavy_rain
+    probability = db.Column(db.Float, nullable=False)  # 0-1
+    
+    race = db.relationship('Race', backref='weather_forecasts')
+    
+# Añadir después del modelo WeatherForecast en app.py
+
+class WeatherChange(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    race_id = db.Column(db.Integer, db.ForeignKey('race.id'), nullable=False)
+    session_type = db.Column(db.String(20), nullable=False)  # test, qualifying, race
+    change_lap = db.Column(db.Integer, nullable=False)  # vuelta en la que cambia el tiempo
+    from_condition = db.Column(db.String(20), nullable=False)  # condición anterior
+    to_condition = db.Column(db.String(20), nullable=False)  # nueva condición
+    probability = db.Column(db.Float, nullable=False)  # 0-1
+    
+    race = db.relationship('Race', backref='weather_changes')
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+# Funciones de cálculo de salarios (para usar en el mercado)
+def calculate_driver_salary(age, skill, experience, aggression, consistency, growth_potential):
+    """Calcula el salario del piloto basado en sus atributos"""
+    # Base salary por ser piloto de F1
+    base_salary = 500000
+    
+    # Factores de ajuste
+    age_factor = 1.0
+    if age <= 25:
+        age_factor = 0.7  # Jóvenes ganan menos
+    elif age <= 30:
+        age_factor = 1.0  # Edad óptima
+    elif age <= 35:
+        age_factor = 1.2  # Experimentados
+    else:
+        age_factor = 1.5  # Veteranos muy valorados
+    
+    # Habilidad y experiencia son los factores más importantes
+    skill_factor = skill / 50.0  # 50 es el promedio
+    experience_factor = experience / 50.0
+    
+    # Factores secundarios
+    consistency_factor = consistency / 50.0
+    growth_factor = growth_potential / 50.0
+    
+    # La agresión puede ser positiva o negativa dependiendo del nivel
+    aggression_factor = 1.0
+    if aggression < 50:
+        aggression_factor = 0.9  # Muy conservador
+    elif aggression > 80:
+        aggression_factor = 1.1  # Muy agresivo (arriesgado pero puede dar resultados)
+    
+    # Cálculo final del salario
+    salary = base_salary * age_factor * skill_factor * experience_factor * consistency_factor * growth_factor * aggression_factor
+    
+    # Ajustar rango razonable para pilotos de F1
+    salary = max(200000, min(15000000, salary))
+    
+    return int(salary)
+
+def calculate_mechanic_salary(age, pit_stop_skill, reliability_skill, growth_potential):
+    """Calcula el salario del mecánico basado en sus atributos"""
+    base_salary = 80000
+    
+    # Factores de ajuste
+    age_factor = 1.0
+    if age <= 30:
+        age_factor = 0.8  # Jóvenes ganan menos
+    elif age <= 45:
+        age_factor = 1.0  # Edad óptima
+    elif age <= 55:
+        age_factor = 1.3  # Experimentados muy valorados
+    else:
+        age_factor = 1.5  # Veteranos con mucha experiencia
+    
+    # Habilidades principales
+    pit_skill_factor = pit_stop_skill / 50.0
+    reliability_factor = reliability_skill / 50.0
+    growth_factor = growth_potential / 50.0
+    
+    # Cálculo final
+    salary = base_salary * age_factor * pit_skill_factor * reliability_factor * growth_factor
+    
+    # Ajustar rango razonable para mecánicos de F1
+    salary = max(50000, min(400000, salary))
+    
+    return int(salary)
+
+def calculate_engineer_salary(age, innovation, development_speed, growth_potential):
+    """Calcula el salario del ingeniero basado en sus atributos"""
+    base_salary = 120000
+    
+    # Factores de ajuste
+    age_factor = 1.0
+    if age <= 35:
+        age_factor = 0.8  # Jóvenes ganan menos
+    elif age <= 50:
+        age_factor = 1.0  # Edad óptima
+    elif age <= 65:
+        age_factor = 1.4  # Experimentados muy valorados
+    else:
+        age_factor = 1.6  # Veteranos con mucha experiencia
+    
+    # Habilidades principales
+    innovation_factor = innovation / 50.0
+    development_factor = development_speed / 50.0
+    growth_factor = growth_potential / 50.0
+    
+    # Cálculo final
+    salary = base_salary * age_factor * innovation_factor * development_factor * growth_factor
+    
+    # Ajustar rango razonable para ingenieros de F1
+    salary = max(80000, min(600000, salary))
+    
+    return int(salary)
+
+# Sistema del juego
+class RaceSimulator:
+    @staticmethod
+    def calculate_race_points(position, has_fastest_lap=False):
+        """Calcula los puntos según la posición y vuelta rápida"""
+        POINTS_SYSTEM = {
+            1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1
+        }
+        FASTEST_LAP_POINT = 1
+        
+        points = POINTS_SYSTEM.get(position, 0)
+        if has_fastest_lap and position <= 10:
+            points += FASTEST_LAP_POINT
+        return points
+
+    @staticmethod
+    def simulate_qualifying(race_id):
+        teams = User.query.filter(User.drivers.any()).all()
+        results = []
+        
+        for team in teams:
+            for driver in team.drivers:
+                base_time = 90 + random.random() * 10
+                driver_skill = (driver.skill + driver.experience) / 2
+                car_performance = sum(comp.strength for comp in team.car_components) / 4
+                
+                final_time = base_time - (driver_skill / 100 * 5) - (car_performance / 100 * 3) + (random.random() * 2 - 1)
+                
+                results.append({
+                    'team_id': team.id,
+                    'driver_id': driver.id,
+                    'driver_name': driver.name,
+                    'team_name': team.team_name,
+                    'time': final_time
+                })
+        
+        results.sort(key=lambda x: x['time'])
+        return results
+
+    @staticmethod
+    def simulate_race(race_id):
+        race = Race.query.get(race_id)
+        teams = User.query.filter(User.drivers.any()).all()
+        events = []
+        
+        # Simular resultados de carrera
+        results = []
+        for team in teams:
+            for driver in team.drivers:
+                # Calcular rendimiento basado en habilidades del piloto y coche
+                driver_performance = (driver.skill * 0.4 + driver.experience * 0.3 + 
+                                    driver.consistency * 0.2 + driver.aggression * 0.1)
+                car_performance = sum(comp.strength for comp in team.car_components) / 4
+                
+                # Factor aleatorio
+                luck = random.uniform(0.8, 1.2)
+                
+                # Calcular puntuación final
+                performance_score = (driver_performance + car_performance) * luck
+                
+                # 5% de probabilidad de DNF (No termina)
+                dnf = random.random() < 0.05
+                
+                results.append({
+                    'team_id': team.id,
+                    'driver_id': driver.id,
+                    'driver_name': driver.name,
+                    'team_name': team.team_name,
+                    'performance_score': performance_score,
+                    'dnf': dnf
+                })
+        
+        # Ordenar por puntuación (mayor a menor)
+        results.sort(key=lambda x: x['performance_score'], reverse=True)
+        
+        # Asignar posiciones y puntos
+        fastest_lap_assigned = False
+        for i, result in enumerate(results):
+            position = i + 1
+            
+            # Si es DNF, posición final basada en cuando abandonó
+            if result['dnf']:
+                dnf_position = random.randint(11, len(results))
+                position = dnf_position
+                # Reordenar para mantener coherencia
+                results = sorted(results, 
+                               key=lambda x: 0 if x['dnf'] else x['performance_score'], 
+                               reverse=True)
+                for j, res in enumerate(results):
+                    if res['dnf']:
+                        res['position'] = j + 1
+                    else:
+                        res['position'] = j + 1 - len([r for r in results[:j] if r['dnf']])
+                break
+            
+            result['position'] = position
+            
+            # Asignar vuelta rápida aleatoriamente al top 10
+            if position <= 10 and not fastest_lap_assigned and random.random() < 0.3:
+                result['fastest_lap'] = True
+                fastest_lap_assigned = True
+            else:
+                result['fastest_lap'] = False
+            
+            # Calcular puntos
+            result['points'] = RaceSimulator.calculate_race_points(
+                position, result.get('fastest_lap', False)
+            )
+        
+        # Simular eventos durante la carrera
+        for lap in range(1, race.circuit.laps + 1):
+            for team in teams:
+                if random.random() < 0.05:  # 5% de probabilidad de evento por vuelta
+                    event_type = random.choice(['overtake', 'pit_stop', 'spin', 'fast_lap'])
+                    event_desc = RaceSimulator.generate_event_description(event_type, team.drivers[0].name)
+                    
+                    event = LiveEvent(
+                        race_id=race_id,
+                        team_id=team.id,
+                        driver_id=team.drivers[0].id,
+                        lap=lap,
+                        event_type=event_type,
+                        description=event_desc
+                    )
+                    db.session.add(event)
+                    events.append(event)
+            
+            # Pequeña pausa para simular tiempo real
+            # db.session.commit()  # Comentado para evitar múltiples commits
+        
+        # Guardar resultados en la base de datos
+        for result in results:
+            standing = ChampionshipStandings(
+                team_id=result['team_id'],
+                driver_id=result['driver_id'],
+                race_id=race_id,
+                points=result['points'],
+                position=result['position'],
+                fastest_lap=result.get('fastest_lap', False),
+                dnf=result['dnf']
+            )
+            db.session.add(standing)
+            
+            # Crear evento para DNF
+            if result['dnf']:
+                event = LiveEvent(
+                    race_id=race_id,
+                    team_id=result['team_id'],
+                    driver_id=result['driver_id'],
+                    lap=random.randint(1, race.circuit.laps),
+                    event_type='dnf',
+                    description=f"¡{result['driver_name']} se retira de la carrera!"
+                )
+                db.session.add(event)
+                events.append(event)
+        
+        db.session.commit()
+        return events
+
+    @staticmethod
+    def generate_event_description(event_type, driver_name):
+        descriptions = {
+            'overtake': f'¡{driver_name} realiza un espectacular adelantamiento!',
+            'pit_stop': f'{driver_name} entra en boxes para cambiar neumáticos',
+            'spin': f'¡{driver_name} da un trompo pero continua!',
+            'fast_lap': f'¡{driver_name} marca el giro más rápido de la carrera!',
+            'dnf': f'¡{driver_name} se retira de la carrera!'
+        }
+        return descriptions.get(event_type, f'{driver_name} tiene un incidente')
+
+class ChampionshipStandings(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    team_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    driver_id = db.Column(db.Integer, db.ForeignKey('driver.id'), nullable=False)
+    race_id = db.Column(db.Integer, db.ForeignKey('race.id'), nullable=False)
+    points = db.Column(db.Integer, default=0)
+    position = db.Column(db.Integer)
+    fastest_lap = db.Column(db.Boolean, default=False)
+    dnf = db.Column(db.Boolean, default=False)
+    
+    team = db.relationship('User', backref='championship_results')
+    driver = db.relationship('Driver', backref='championship_results')
+    race = db.relationship('Race', backref='championship_results')
+
+# Sistema de puntos F1 actual (desde 2022)
+POINTS_SYSTEM = {
+    1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1
+}
+FASTEST_LAP_POINT = 1
+
+# Rutas de la aplicación
+@app.route('/')
+def index():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+    return render_template('index.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form['username']
+        email = request.form['email']
+        team_name = request.form['team_name']
+        password = request.form['password']
+        
+        if User.query.filter_by(username=username).first():
+            return render_template('register.html', error='Usuario ya existe')
+        
+        user = User(
+            username=username,
+            email=email,
+            team_name=team_name,
+            password_hash=generate_password_hash(password),
+            money=Config.STARTING_MONEY
+        )
+        
+        db.session.add(user)
+        db.session.commit()
+        
+        # Crear componentes iniciales del coche
+        components = ['engine', 'aerodynamics', 'brakes', 'suspension']
+        for comp_type in components:
+            component = CarComponent(
+                team_id=user.id,
+                component_type=comp_type,
+                strength=50,
+                reliability=50
+            )
+            db.session.add(component)
+        
+        db.session.commit()
+        
+        login_user(user)
+        return redirect(url_for('dashboard'))
+    
+    return render_template('register.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        
+        user = User.query.filter_by(username=username).first()
+        if user and check_password_hash(user.password_hash, password):
+            login_user(user)
+            return redirect(url_for('dashboard'))
+        
+        return render_template('login.html', error='Credenciales inválidas')
+    
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('index'))
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    team_info = {
+        'money': current_user.money,
+        'drivers': current_user.drivers,
+        'mechanics': current_user.mechanics,
+        'engineers': current_user.engineers,
+        'car_components': current_user.car_components
+    }
+    
+    # Encontrar el próximo evento
+    now = datetime.utcnow()
+    next_event = None
+    
+    # Buscar en todas las carreras
+    races = Race.query.all()
+    for race in races:
+        sessions = [
+            ('test', race.test_session),
+            ('qualifying', race.qualifying_session), 
+            ('race', race.race_session)
+        ]
+        
+        for session_type, session_time in sessions:
+            if session_time > now:
+                if not next_event or session_time < next_event['session_datetime']:
+                    next_event = {
+                        'race_id': race.id,
+                        'circuit': race.circuit,
+                        'session_type': session_type,
+                        'session_datetime': session_time
+                    }
+    
+    return render_template('dashboard.html', team=team_info, next_event=next_event)
+
+@app.route('/team')
+@login_required
+def team_management():
+    return render_template('team.html', team=current_user)
+
+@app.route('/market')
+@login_required
+def market():
+    available_drivers = Driver.query.filter_by(market_available=True).all()
+    available_mechanics = Mechanic.query.filter_by(market_available=True).all()
+    available_engineers = Engineer.query.filter_by(market_available=True).all()
+    
+    return render_template('market.html', 
+                         drivers=available_drivers,
+                         mechanics=available_mechanics,
+                         engineers=available_engineers)
+
+@app.route('/buy/driver/<int:driver_id>')
+@login_required
+def buy_driver(driver_id):
+    if len(current_user.drivers) >= Config.MAX_DRIVERS:
+        return jsonify({'success': False, 'message': 'Límite de pilotos alcanzado'})
+    
+    driver = Driver.query.get(driver_id)
+    if driver and driver.market_available and current_user.money >= driver.salary:
+        current_user.money -= driver.salary
+        driver.team_id = current_user.id
+        driver.market_available = False
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Piloto comprado'})
+    
+    return jsonify({'success': False, 'message': 'Error en la compra'})
+
+@app.route('/buy/mechanic/<int:mechanic_id>')
+@login_required
+def buy_mechanic(mechanic_id):
+    if len(current_user.mechanics) >= Config.MAX_MECHANICS:
+        return jsonify({'success': False, 'message': 'Límite de mecánicos alcanzado'})
+    
+    mechanic = Mechanic.query.get(mechanic_id)
+    if mechanic and mechanic.market_available and current_user.money >= mechanic.salary:
+        current_user.money -= mechanic.salary
+        mechanic.team_id = current_user.id
+        mechanic.market_available = False
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Mecánico contratado'})
+    
+    return jsonify({'success': False, 'message': 'Error en la contratación'})
+
+@app.route('/buy/engineer/<int:engineer_id>')
+@login_required
+def buy_engineer(engineer_id):
+    if len(current_user.engineers) >= Config.MAX_ENGINEERS:
+        return jsonify({'success': False, 'message': 'Límite de ingenieros alcanzado'})
+    
+    engineer = Engineer.query.get(engineer_id)
+    if engineer and engineer.market_available and current_user.money >= engineer.salary:
+        current_user.money -= engineer.salary
+        engineer.team_id = current_user.id
+        engineer.market_available = False
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Ingeniero contratado'})
+    
+    return jsonify({'success': False, 'message': 'Error en la contratación'})
+
+@app.route('/fire/driver/<int:driver_id>')
+@login_required
+def fire_driver(driver_id):
+    driver = Driver.query.get(driver_id)
+    if driver and driver.team_id == current_user.id:
+        driver.team_id = None
+        driver.market_available = True
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Piloto despedido'})
+    
+    return jsonify({'success': False, 'message': 'Error al despedir'})
+
+@app.route('/fire/mechanic/<int:mechanic_id>')
+@login_required
+def fire_mechanic(mechanic_id):
+    mechanic = Mechanic.query.get(mechanic_id)
+    if mechanic and mechanic.team_id == current_user.id:
+        mechanic.team_id = None
+        mechanic.market_available = True
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Mecánico despedido'})
+    
+    return jsonify({'success': False, 'message': 'Error al despedir'})
+
+@app.route('/fire/engineer/<int:engineer_id>')
+@login_required
+def fire_engineer(engineer_id):
+    engineer = Engineer.query.get(engineer_id)
+    if engineer and engineer.team_id == current_user.id:
+        engineer.team_id = None
+        engineer.market_available = True
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Ingeniero despedido'})
+    
+    return jsonify({'success': False, 'message': 'Error al despedir'})
+
+@app.route('/upgrades')
+@login_required
+def upgrades():
+    # Obtener mejora activa
+    active_upgrade = Upgrade.query.filter_by(
+        team_id=current_user.id, 
+        completed=False
+    ).first()
+    
+    # Obtener historial (últimas 10 mejoras)
+    upgrade_history = Upgrade.query.filter_by(
+        team_id=current_user.id
+    ).order_by(Upgrade.start_date.desc()).limit(10).all()
+    
+    return render_template('upgrades.html', 
+                         team=current_user,
+                         active_upgrade=active_upgrade,
+                         upgrade_history=upgrade_history)
+
+@app.route('/start_upgrade', methods=['POST'])
+@login_required
+def start_upgrade():
+    # Verificar si ya hay una mejora en progreso
+    active_upgrade = Upgrade.query.filter_by(
+        team_id=current_user.id, 
+        completed=False
+    ).first()
+    
+    if active_upgrade:
+        return jsonify({
+            'success': False, 
+            'message': 'Ya tienes una mejora en progreso'
+        }), 400
+
+    # Obtener datos del nuevo formulario
+    component_type = request.form.get('component_type')
+    level = int(request.form.get('level'))
+    weeks = int(request.form.get('weeks'))
+    
+    # Validar datos
+    if not component_type or level not in [1, 2, 3] or weeks not in [1, 2, 3]:
+        return jsonify({
+            'success': False, 
+            'message': 'Datos de mejora inválidos'
+        }), 400
+
+    # Calcular costo total (500,000 por nivel y por semana)
+    level_cost = level * 500000
+    weeks_cost = weeks * 500000
+    total_cost = level_cost + weeks_cost
+    
+    # Verificar fondos
+    if current_user.money < total_cost:
+        return jsonify({
+            'success': False, 
+            'message': 'Fondos insuficientes para esta mejora'
+        }), 400
+    
+    # Crear la mejora
+    upgrade = Upgrade(
+        team_id=current_user.id,
+        component_type=component_type,
+        level=level,
+        weeks=weeks,
+        total_cost=total_cost,
+        start_date=datetime.utcnow(),
+        end_date=datetime.utcnow() + timedelta(weeks=weeks),
+        completed=False
+    )
+    
+    # Deducción de dinero
+    current_user.money -= total_cost
+    
+    db.session.add(upgrade)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': f'Mejora iniciada. Costo: €{total_cost:,.0f}'
+    })
+
+@app.route('/complete_upgrade/<int:upgrade_id>', methods=['POST'])
+@login_required
+def complete_upgrade(upgrade_id):
+    upgrade = Upgrade.query.get_or_404(upgrade_id)
+    
+    # Verificar permisos
+    if upgrade.team_id != current_user.id:
+        flash('No autorizado', 'danger')
+        return redirect(url_for('upgrades'))
+    
+    # Verificar si la mejora está completa
+    if upgrade.progress < 100:
+        flash('La mejora aún no está completa', 'warning')
+        return redirect(url_for('upgrades'))
+    
+    # Aplicar mejora al componente
+    component = CarComponent.query.filter_by(
+        team_id=current_user.id,
+        component_type=upgrade.component_type
+    ).first()
+    
+    if component:
+        # Calcular mejoras basadas en el nivel
+        strength_improvement = upgrade.level * 5  # +5, +10, +15
+        reliability_improvement = upgrade.level * 3  # +3, +6, +9
+        
+        component.strength = min(100, component.strength + strength_improvement)
+        component.reliability = min(100, component.reliability + reliability_improvement)
+    
+    # Marcar como completada
+    upgrade.completed = True
+    
+    db.session.commit()
+    
+    flash(f'¡Mejora completada! +{strength_improvement} fuerza, +{reliability_improvement} fiabilidad', 'success')
+    return redirect(url_for('upgrades'))
+
+# Añadir después de las rutas de upgrades en app.py
+
+@app.route('/training')
+@login_required
+def training():
+    # Obtener entrenamiento activo
+    active_training = Training.query.filter_by(
+        team_id=current_user.id, 
+        completed=False
+    ).first()
+    
+    # Obtener historial (últimos 10 entrenamientos)
+    training_history = Training.query.filter_by(
+        team_id=current_user.id
+    ).order_by(Training.start_date.desc()).limit(10).all()
+    
+    return render_template('training.html', 
+                         team=current_user,
+                         active_training=active_training,
+                         training_history=training_history)
+
+@app.route('/start_training', methods=['POST'])
+@login_required
+def start_training():
+    # Verificar si ya hay un entrenamiento en progreso
+    active_training = Training.query.filter_by(
+        team_id=current_user.id, 
+        completed=False
+    ).first()
+    
+    if active_training:
+        return jsonify({
+            'success': False, 
+            'message': 'Ya tienes un entrenamiento en progreso'
+        }), 400
+
+    # Obtener datos del formulario
+    staff_type = request.form.get('staff_type')
+    staff_id = int(request.form.get('staff_id'))
+    attribute = request.form.get('attribute')
+    level = int(request.form.get('level'))
+    weeks = int(request.form.get('weeks'))
+    
+    # Validar datos
+    if not staff_type or not attribute or level not in [1, 2, 3] or weeks not in [1, 2, 3]:
+        return jsonify({
+            'success': False, 
+            'message': 'Datos de entrenamiento inválidos'
+        }), 400
+
+    # Verificar que el staff pertenece al equipo
+    staff = None
+    if staff_type == 'driver':
+        staff = Driver.query.filter_by(id=staff_id, team_id=current_user.id).first()
+    elif staff_type == 'mechanic':
+        staff = Mechanic.query.filter_by(id=staff_id, team_id=current_user.id).first()
+    elif staff_type == 'engineer':
+        staff = Engineer.query.filter_by(id=staff_id, team_id=current_user.id).first()
+    
+    if not staff:
+        return jsonify({
+            'success': False, 
+            'message': 'Personal no encontrado o no pertenece a tu equipo'
+        }), 400
+
+    # Calcular costo total (200,000 por nivel y por semana)
+    level_cost = level * 200000
+    weeks_cost = weeks * 200000
+    total_cost = level_cost + weeks_cost
+    
+    # Verificar fondos
+    if current_user.money < total_cost:
+        return jsonify({
+            'success': False, 
+            'message': 'Fondos insuficientes para este entrenamiento'
+        }), 400
+    
+    # Crear el entrenamiento
+    training = Training(
+        team_id=current_user.id,
+        staff_type=staff_type,
+        staff_id=staff_id,
+        attribute=attribute,
+        level=level,
+        weeks=weeks,
+        total_cost=total_cost,
+        start_date=datetime.utcnow(),
+        end_date=datetime.utcnow() + timedelta(weeks=weeks),
+        completed=False
+    )
+    
+    # Deducción de dinero
+    current_user.money -= total_cost
+    
+    db.session.add(training)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': f'Entrenamiento iniciado. Costo: €{total_cost:,.0f}'
+    })
+
+@app.route('/complete_training/<int:training_id>', methods=['POST'])
+@login_required
+def complete_training(training_id):
+    training = Training.query.get_or_404(training_id)
+    
+    # Verificar permisos
+    if training.team_id != current_user.id:
+        flash('No autorizado', 'danger')
+        return redirect(url_for('training'))
+    
+    # Verificar si el entrenamiento está completo
+    if training.progress < 100:
+        flash('El entrenamiento aún no está completo', 'warning')
+        return redirect(url_for('training'))
+    
+    # Aplicar mejora al personal
+    staff = None
+    if training.staff_type == 'driver':
+        staff = Driver.query.filter_by(id=training.staff_id, team_id=current_user.id).first()
+    elif training.staff_type == 'mechanic':
+        staff = Mechanic.query.filter_by(id=training.staff_id, team_id=current_user.id).first()
+    elif training.staff_type == 'engineer':
+        staff = Engineer.query.filter_by(id=training.staff_id, team_id=current_user.id).first()
+    
+    if staff:
+        # Calcular mejora basada en el nivel
+        improvement = training.level * 3  # +3, +6, +9 puntos
+        
+        # Aplicar mejora al atributo correspondiente
+        if hasattr(staff, training.attribute):
+            current_value = getattr(staff, training.attribute)
+            new_value = min(100, current_value + improvement)
+            setattr(staff, training.attribute, new_value)
+            
+            # Actualizar fecha de último entrenamiento
+            staff.last_trained = datetime.utcnow().date()
+    
+    # Marcar como completado
+    training.completed = True
+    
+    db.session.commit()
+    
+    flash(f'¡Entrenamiento completado! +{improvement} {training.attribute}', 'success')
+    return redirect(url_for('training'))
+
+# Actualizar el sistema programado para completar entrenamientos
+class TrainingSystem:
+    @staticmethod
+    def complete_trainings():
+        """Completa los entrenamientos que han terminado su tiempo"""
+        trainings = Training.query.filter(
+            Training.end_date <= datetime.utcnow(),
+            Training.completed == False
+        ).all()
+        
+        for training in trainings:
+            # Aplicar mejora (similar a complete_training)
+            staff = None
+            if training.staff_type == 'driver':
+                staff = Driver.query.filter_by(id=training.staff_id, team_id=training.team_id).first()
+            elif training.staff_type == 'mechanic':
+                staff = Mechanic.query.filter_by(id=training.staff_id, team_id=training.team_id).first()
+            elif training.staff_type == 'engineer':
+                staff = Engineer.query.filter_by(id=training.staff_id, team_id=training.team_id).first()
+            
+            if staff:
+                improvement = training.level * 3
+                if hasattr(staff, training.attribute):
+                    current_value = getattr(staff, training.attribute)
+                    new_value = min(100, current_value + improvement)
+                    setattr(staff, training.attribute, new_value)
+                    staff.last_trained = datetime.utcnow().date()
+            
+            training.completed = True
+        
+        db.session.commit()
+
+# Actualizar la tarea programada
+def scheduled_training_completion():
+    with app.app_context():
+        TrainingSystem.complete_trainings()
+
+#scheduler.add_job(scheduled_training_completion, 'interval', hours=1)
+
+@app.route('/calendar')
+@login_required
+def calendar():
+    races = Race.query.all()
+    now = datetime.utcnow()
+    
+    # Encontrar la próxima carrera
+    next_race = None
+    for race in races:
+        if race.race_session > now:
+            next_race = race
+            break
+    
+    return render_template('calendar.html', races=races, next_race=next_race, now=now)
+
+@app.route('/race/<int:race_id>')
+@login_required
+def race_details(race_id):
+    race = Race.query.get_or_404(race_id)
+    
+    # Verificar que el circuito esté cargado
+    if not race.circuit:
+        return "Error: Circuito no encontrado para esta carrera", 500
+        
+    now = datetime.utcnow()
+    return render_template('race.html', race=race, now=now)
+
+@app.route('/tests/<int:race_id>')
+@login_required
+def test_session(race_id):
+    race = Race.query.get_or_404(race_id)
+    strategies = RaceStrategy.query.filter_by(
+        team_id=current_user.id, 
+        race_id=race_id
+    ).all()
+    # Obtener pronósticos meteorológicos
+    weather_forecasts = WeatherForecast.query.filter_by(race_id=race_id).all()
+    return render_template('tests.html', race=race, team=current_user, strategies=strategies, weather_forecasts=weather_forecasts)
+
+@app.route('/race_strategy/<int:race_id>')
+@login_required
+def race_strategy(race_id):
+    race = Race.query.get_or_404(race_id)
+    strategies = RaceStrategy.query.filter_by(
+        team_id=current_user.id, 
+        race_id=race_id
+    ).all()
+    # Obtener pronósticos meteorológicos
+    weather_forecasts = WeatherForecast.query.filter_by(race_id=race_id).all()
+    return render_template('race_strategy.html', race=race, team=current_user, strategies=strategies, weather_forecasts=weather_forecasts)
+
+@app.route('/save_race_strategy', methods=['POST'])
+@login_required
+def save_race_strategy():
+    data = request.json
+    
+    # Verificar que el piloto pertenece al equipo
+    driver = Driver.query.get(data['driver_id'])
+    if not driver or driver.team_id != current_user.id:
+        return jsonify({'success': False, 'message': 'Piloto no válido'})
+    
+    # Crear nueva estrategia
+    strategy = RaceStrategy(
+        team_id=current_user.id,
+        race_id=data['race_id'],
+        driver_id=data['driver_id'],
+        strategy_name=data['strategy_name'],
+        total_pit_stops=len(data['segments']) - 1,
+        starting_tyre=data.get('starting_tyre', 'soft'),
+        rain_strategy=data.get('rain_strategy', 'continue'),
+        heavy_rain_strategy=data.get('heavy_rain_strategy', 'continue'),
+        dry_strategy=data.get('dry_strategy', 'continue')
+    )
+    db.session.add(strategy)
+    db.session.flush()
+    
+    # Crear segmentos
+    for segment_data in data['segments']:
+        segment = StrategySegment(
+            strategy_id=strategy.id,
+            segment_order=segment_data['segment_order'],
+            tyre_type=segment_data['tyre_type'],
+            laps_planned=segment_data['laps_planned']
+        )
+        db.session.add(segment)
+    
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Estrategia guardada'})
+
+@app.route('/delete_strategy/<int:strategy_id>')
+@login_required
+def delete_strategy(strategy_id):
+    strategy = RaceStrategy.query.get(strategy_id)
+    if strategy and strategy.team_id == current_user.id:
+        # Eliminar segmentos primero
+        StrategySegment.query.filter_by(strategy_id=strategy_id).delete()
+        db.session.delete(strategy)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Estrategia eliminada'})
+    
+    return jsonify({'success': False, 'message': 'Error al eliminar'})
+
+@app.route('/get_tyre_data')
+@login_required
+def get_tyre_data():
+    tyres = TyreType.query.all()
+    tyre_data = {}
+    for tyre in tyres:
+        tyre_data[tyre.name] = {
+            'dry_performance': tyre.dry_performance,
+            'wet_performance': tyre.wet_performance,
+            'durability': tyre.durability,
+            'warmup_time': tyre.warmup_time
+        }
+    return jsonify(tyre_data)
+
+@app.route('/live_race/<int:race_id>')
+@login_required
+def live_race(race_id):
+    race = Race.query.get(race_id)
+    return render_template('live_race.html', race=race)
+
+@app.route('/api/live_events/<int:race_id>')
+@login_required
+def live_events(race_id):
+    events = LiveEvent.query.filter_by(race_id=race_id).order_by(LiveEvent.created_at.desc()).limit(20).all()
+    events_data = [{
+        'description': event.description,
+        'lap': event.lap,
+        'type': event.event_type
+    } for event in events]
+    
+    return jsonify(events_data)
+    
+@app.route('/standings')
+@login_required
+def standings():
+    """Página principal de clasificaciones"""
+    return render_template('standings.html')
+
+@app.route('/api/standings/drivers')
+@login_required
+def api_driver_standings():
+    """API para clasificación de pilotos (totales)"""
+    # Obtener todos los resultados agrupados por piloto
+    driver_results = db.session.query(
+        Driver.id,
+        Driver.name,
+        User.team_name,
+        db.func.sum(ChampionshipStandings.points).label('total_points'),
+        db.func.count(ChampionshipStandings.id).label('races_entered')
+    ).join(ChampionshipStandings, Driver.id == ChampionshipStandings.driver_id
+    ).join(User, ChampionshipStandings.team_id == User.id
+    ).group_by(Driver.id, Driver.name, User.team_name
+    ).order_by(db.desc('total_points')).all()
+    
+    standings = []
+    for i, result in enumerate(driver_results):
+        standings.append({
+            'position': i + 1,
+            'driver_name': result.name,
+            'team_name': result.team_name,
+            'total_points': result.total_points or 0,
+            'races_entered': result.races_entered or 0
+        })
+    
+    return jsonify(standings)
+
+@app.route('/api/standings/teams')
+@login_required
+def api_team_standings():
+    """API para clasificación de escuderías (totales)"""
+    # Obtener todos los resultados agrupados por equipo
+    team_results = db.session.query(
+        User.id,
+        User.team_name,
+        db.func.sum(ChampionshipStandings.points).label('total_points'),
+        db.func.count(ChampionshipStandings.id).label('races_entered')
+    ).join(ChampionshipStandings, User.id == ChampionshipStandings.team_id
+    ).group_by(User.id, User.team_name
+    ).order_by(db.desc('total_points')).all()
+    
+    standings = []
+    for i, result in enumerate(team_results):
+        standings.append({
+            'position': i + 1,
+            'team_name': result.team_name,
+            'total_points': result.total_points or 0,
+            'races_entered': result.races_entered or 0
+        })
+    
+    return jsonify(standings)
+
+@app.route('/api/standings/race/<int:race_id>/drivers')
+@login_required
+def api_race_driver_standings(race_id):
+    """API para clasificación de pilotos por carrera específica"""
+    race_results = db.session.query(
+        ChampionshipStandings.position,
+        Driver.name,
+        User.team_name,
+        ChampionshipStandings.points,
+        ChampionshipStandings.fastest_lap,
+        ChampionshipStandings.dnf
+    ).join(Driver, ChampionshipStandings.driver_id == Driver.id
+    ).join(User, ChampionshipStandings.team_id == User.id
+    ).filter(ChampionshipStandings.race_id == race_id
+    ).order_by(ChampionshipStandings.position).all()
+    
+    standings = []
+    for result in race_results:
+        standings.append({
+            'position': result.position,
+            'driver_name': result.name,
+            'team_name': result.team_name,
+            'points': result.points,
+            'fastest_lap': result.fastest_lap,
+            'dnf': result.dnf,
+            'status': 'DNF' if result.dnf else 'Finished'
+        })
+    
+    return jsonify(standings)
+
+@app.route('/api/standings/race/<int:race_id>/teams')
+@login_required
+def api_race_team_standings(race_id):
+    """API para clasificación de escuderías por carrera específica"""
+    team_results = db.session.query(
+        User.team_name,
+        db.func.sum(ChampionshipStandings.points).label('race_points')
+    ).join(ChampionshipStandings, User.id == ChampionshipStandings.team_id
+    ).filter(ChampionshipStandings.race_id == race_id
+    ).group_by(User.team_name
+    ).order_by(db.desc('race_points')).all()
+    
+    standings = []
+    for i, result in enumerate(team_results):
+        standings.append({
+            'position': i + 1,
+            'team_name': result.team_name,
+            'points': result.race_points or 0
+        })
+    
+    return jsonify(standings)
+
+@app.route('/api/races')
+@login_required
+def api_races():
+    """API para listar todas las carreras"""
+    races = Race.query.all()
+    races_data = []
+    for race in races:
+        races_data.append({
+            'id': race.id,
+            'name': race.circuit.name,
+            'country': race.circuit.country,
+            'round_number': race.round_number,
+            'race_date': race.race_session.strftime('%Y-%m-%d')
+        })
+    
+    return jsonify(races_data)
+    
+@app.route('/championship')
+@login_required
+def championship():
+    """Página de clasificación del campeonato"""
+    # Obtener todas las carreras para el selector
+    races = Race.query.all()
+    
+    # Obtener clasificación actual de pilotos
+    driver_standings = db.session.query(
+        Driver.id,
+        Driver.name,
+        User.team_name,
+        db.func.sum(ChampionshipStandings.points).label('total_points'),
+        db.func.count(ChampionshipStandings.id).label('races_entered')
+    ).join(ChampionshipStandings, Driver.id == ChampionshipStandings.driver_id
+    ).join(User, ChampionshipStandings.team_id == User.id
+    ).group_by(Driver.id, Driver.name, User.team_name
+    ).order_by(db.desc('total_points')).all()
+    
+    # Obtener clasificación actual de equipos
+    team_standings = db.session.query(
+        User.id,
+        User.team_name,
+        db.func.sum(ChampionshipStandings.points).label('total_points'),
+        db.func.count(ChampionshipStandings.id).label('races_entered')
+    ).join(ChampionshipStandings, User.id == ChampionshipStandings.team_id
+    ).group_by(User.id, User.team_name
+    ).order_by(db.desc('total_points')).all()
+    
+    return render_template('championship.html', 
+                         races=races,
+                         driver_standings=driver_standings,
+                         team_standings=team_standings)
+                         
+@app.route('/simulate_test', methods=['POST'])
+@login_required
+def simulate_test():
+    """Simula una sesión de tests y guarda los resultados"""
+    try:
+        data = request.json
+        
+        # Validar datos
+        required_fields = ['driver_id', 'tyre_type', 'total_laps', 'track_condition', 'race_id']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'success': False, 'message': f'Campo requerido faltante: {field}'})
+        
+        # Verificar que el piloto pertenece al equipo
+        driver = Driver.query.filter_by(id=data['driver_id'], team_id=current_user.id).first()
+        if not driver:
+            return jsonify({'success': False, 'message': 'Piloto no válido'})
+        
+        # Crear sesión de test
+        test_session = TestSession(
+            team_id=current_user.id,
+            driver_id=data['driver_id'],
+            race_id=data['race_id']
+        )
+        db.session.add(test_session)
+        db.session.flush()
+        
+        # Simular vueltas
+        lap_results = simulate_test_laps(
+            driver, 
+            data['tyre_type'], 
+            data['total_laps'], 
+            data['track_condition']
+        )
+        
+        # Guardar vueltas
+        for lap_data in lap_results:
+            test_lap = TestLap(
+                test_session_id=test_session.id,
+                lap_number=lap_data['lap_number'],
+                tyre_type=lap_data['tyre_type'],
+                lap_time=lap_data['lap_time'],
+                tyre_wear=lap_data['tyre_wear'],
+                track_condition=lap_data['track_condition']
+            )
+            db.session.add(test_lap)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Test completado exitosamente',
+            'results': lap_results
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Error en la simulación: {str(e)}'})
+
+# Funciones auxiliares para la simulación de tests
+def simulate_test_laps(driver, initial_tyre, total_laps, track_condition):
+    """Simula las vueltas del test"""
+    import random
+    lap_results = []
+    current_tyre = initial_tyre
+    tyre_wear = 0
+    incidents_count = 0
+    total_time_lost = 0
+    
+    for lap in range(1, total_laps + 1):
+        # Simular condiciones cambiantes (10% de probabilidad)
+        current_track_condition = track_condition
+        if lap > 5 and random.random() < 0.1:
+            conditions = ['dry', 'light_rain', 'heavy_rain']
+            current_track_condition = random.choice(conditions)
+        
+        # Calcular desgaste
+        base_wear_rate = get_wear_rate(current_tyre, current_track_condition)
+        skill_factor = (100 - driver.skill) / 200
+        wear_rate = base_wear_rate * (1 + skill_factor) + random.random() * 3
+        tyre_wear += wear_rate
+        
+        # Calcular tiempo de vuelta
+        base_time = get_base_time(current_tyre, current_track_condition)
+        wear_penalty = calculate_wear_penalty(tyre_wear, current_tyre)
+        driver_time_bonus = (100 - driver.skill) / 50
+        
+        lap_time = base_time - driver_time_bonus + wear_penalty
+        
+        # Verificar incidentes
+        incident_occurred = False
+        time_lost_this_lap = 0
+        
+        if (tyre_wear > 80 or 
+            is_wrong_tyre_for_conditions(current_tyre, current_track_condition)):
+            incident_chance = calculate_incident_chance(
+                tyre_wear, driver.consistency, current_tyre, current_track_condition
+            )
+            if random.random() * 100 < incident_chance:
+                incident = generate_incident(tyre_wear, current_track_condition)
+                time_lost_this_lap = calculate_time_lost(incident)
+                lap_time += time_lost_this_lap
+                incidents_count += 1
+                total_time_lost += time_lost_this_lap
+                incident_occurred = True
+                
+                # En tests, cambio de neumáticos por incidente grave
+                if incident['type'] in ['Pinchazo', 'Hidroplaneo']:
+                    current_tyre = get_appropriate_tyre(current_track_condition)
+                    tyre_wear = 0
+        
+        # Cambio de neumáticos por desgaste
+        if tyre_wear >= get_max_wear(current_tyre) and not incident_occurred:
+            current_tyre = get_next_tyre(current_tyre, current_track_condition)
+            tyre_wear = 0
+        
+        lap_results.append({
+            'lap_number': lap,
+            'tyre_type': current_tyre,
+            'lap_time': round(lap_time, 3),
+            'tyre_wear': min(150, int(tyre_wear)),  # Máximo 150% para mostrar degradación extrema
+            'track_condition': current_track_condition,
+            'incident_occurred': incident_occurred,
+            'time_lost': time_lost_this_lap
+        })
+    
+    return lap_results
+
+def get_wear_rate(tyre_type, track_condition):
+    base_rates = {
+        'soft': 6, 'medium': 4, 'hard': 2.5, 
+        'wet': 3, 'extreme_wet': 2
+    }
+    rate = base_rates.get(tyre_type, 4)
+    
+    if track_condition != 'dry' and tyre_type in ['soft', 'medium', 'hard']:
+        rate *= 1.5
+    
+    return rate
+
+def get_base_time(tyre_type, track_condition):
+    dry_times = {
+        'soft': 82, 'medium': 84, 'hard': 86, 
+        'wet': 95, 'extreme_wet': 98
+    }
+    base_time = dry_times.get(tyre_type, 84)
+    
+    if track_condition == 'light_rain':
+        if tyre_type in ['soft', 'medium', 'hard']:
+            base_time += 15
+        elif tyre_type == 'wet':
+            base_time += 2
+        else:
+            base_time += 5
+    elif track_condition == 'heavy_rain':
+        if tyre_type in ['soft', 'medium', 'hard']:
+            base_time += 25
+        elif tyre_type == 'wet':
+            base_time += 8
+        else:
+            base_time += 3
+    
+    return base_time
+
+def calculate_wear_penalty(tyre_wear, tyre_type):
+    if tyre_wear <= 50:
+        return 0
+    elif tyre_wear <= 80:
+        return (tyre_wear - 50) * 0.1
+    elif tyre_wear <= 100:
+        return 3 + (tyre_wear - 80) * 0.2
+    else:
+        return 7 + (tyre_wear - 100) * 0.3
+
+def is_wrong_tyre_for_conditions(tyre_type, track_condition):
+    if track_condition == 'dry':
+        return tyre_type in ['wet', 'extreme_wet']
+    elif track_condition == 'light_rain':
+        return tyre_type in ['soft', 'medium', 'hard']
+    elif track_condition == 'heavy_rain':
+        return tyre_type != 'extreme_wet'
+    return False
+
+def calculate_incident_chance(tyre_wear, driver_consistency, tyre_type, track_condition):
+    base_chance = 0
+    
+    if tyre_wear > 120:
+        base_chance = 40
+    elif tyre_wear > 100:
+        base_chance = 25
+    elif tyre_wear > 90:
+        base_chance = 15
+    elif tyre_wear > 80:
+        base_chance = 8
+    
+    if is_wrong_tyre_for_conditions(tyre_type, track_condition):
+        base_chance *= 3
+    
+    if tyre_type == 'soft':
+        base_chance *= 1.3
+    elif tyre_type == 'medium':
+        base_chance *= 1.1
+    
+    consistency_factor = (100 - driver_consistency) / 100
+    return base_chance * (1 + consistency_factor * 0.5)
+
+def generate_incident(tyre_wear, track_condition):
+    import random
+    incidents = [
+        {'type': 'Trompo', 'severity': 'medium', 'base_time': 3},
+        {'type': 'Salida de pista', 'severity': 'low', 'base_time': 2},
+        {'type': 'Bloqueo de ruedas', 'severity': 'low', 'base_time': 1.5},
+        {'type': 'Pinchazo', 'severity': 'high', 'base_time': 15},
+        {'type': 'Pérdida de aerodinámica', 'severity': 'medium', 'base_time': 5}
+    ]
+    
+    if track_condition != 'dry':
+        incidents.extend([
+            {'type': 'Hidroplaneo', 'severity': 'high', 'base_time': 10},
+            {'type': 'Visibilidad cero', 'severity': 'medium', 'base_time': 6}
+        ])
+    
+    if tyre_wear > 100:
+        incidents = [i for i in incidents if i['severity'] != 'low']
+    if tyre_wear > 120:
+        incidents = [i for i in incidents if i['severity'] == 'high']
+    
+    return random.choice(incidents)
+
+def calculate_time_lost(incident):
+    import random
+    return incident['base_time'] + random.random() * incident['base_time'] * 0.5
+
+def get_appropriate_tyre(track_condition):
+    if track_condition == 'dry':
+        return 'soft'
+    elif track_condition == 'light_rain':
+        return 'wet'
+    return 'extreme_wet'
+
+def get_max_wear(tyre_type):
+    max_wear = {
+        'soft': 120, 'medium': 130, 'hard': 140, 
+        'wet': 150, 'extreme_wet': 150
+    }
+    return max_wear.get(tyre_type, 120)
+
+def get_next_tyre(current_tyre, track_condition):
+    if track_condition != 'dry':
+        if current_tyre == 'wet':
+            return 'extreme_wet'
+        return 'wet'
+    
+    sequence = ['soft', 'medium', 'hard']
+    if current_tyre in sequence:
+        current_index = sequence.index(current_tyre)
+        return sequence[(current_index + 1) % len(sequence)]
+    return 'soft'
+
+# Funciones auxiliares para la simulación
+def get_wear_rate(tyre_type, track_condition):
+    base_rates = {
+        'soft': 6, 'medium': 4, 'hard': 2.5, 
+        'wet': 3, 'extreme_wet': 2
+    }
+    rate = base_rates.get(tyre_type, 4)
+    
+    if track_condition != 'dry' and tyre_type in ['soft', 'medium', 'hard']:
+        rate *= 1.5
+    
+    return rate
+
+def get_base_time(tyre_type, track_condition):
+    dry_times = {
+        'soft': 82, 'medium': 84, 'hard': 86, 
+        'wet': 95, 'extreme_wet': 98
+    }
+    base_time = dry_times.get(tyre_type, 84)
+    
+    if track_condition == 'light_rain':
+        if tyre_type in ['soft', 'medium', 'hard']:
+            base_time += 15
+        elif tyre_type == 'wet':
+            base_time += 2
+        else:
+            base_time += 5
+    elif track_condition == 'heavy_rain':
+        if tyre_type in ['soft', 'medium', 'hard']:
+            base_time += 25
+        elif tyre_type == 'wet':
+            base_time += 8
+        else:
+            base_time += 3
+    
+    return base_time
+
+def calculate_wear_penalty(tyre_wear, tyre_type):
+    if tyre_wear <= 50:
+        return 0
+    elif tyre_wear <= 80:
+        return (tyre_wear - 50) * 0.1
+    elif tyre_wear <= 100:
+        return 3 + (tyre_wear - 80) * 0.2
+    else:
+        return 7 + (tyre_wear - 100) * 0.3
+
+def is_wrong_tyre_for_conditions(tyre_type, track_condition):
+    if track_condition == 'dry':
+        return tyre_type in ['wet', 'extreme_wet']
+    elif track_condition == 'light_rain':
+        return tyre_type in ['soft', 'medium', 'hard']
+    elif track_condition == 'heavy_rain':
+        return tyre_type != 'extreme_wet'
+    return False
+
+def calculate_incident_chance(tyre_wear, driver_consistency, tyre_type, track_condition):
+    base_chance = 0
+    
+    if tyre_wear > 120:
+        base_chance = 40
+    elif tyre_wear > 100:
+        base_chance = 25
+    elif tyre_wear > 90:
+        base_chance = 15
+    elif tyre_wear > 80:
+        base_chance = 8
+    
+    if is_wrong_tyre_for_conditions(tyre_type, track_condition):
+        base_chance *= 3
+    
+    if tyre_type == 'soft':
+        base_chance *= 1.3
+    elif tyre_type == 'medium':
+        base_chance *= 1.1
+    
+    consistency_factor = (100 - driver_consistency) / 100
+    return base_chance * (1 + consistency_factor * 0.5)
+
+def generate_incident(tyre_wear, track_condition):
+    incidents = [
+        {'type': 'Trompo', 'severity': 'medium', 'base_time': 3},
+        {'type': 'Salida de pista', 'severity': 'low', 'base_time': 2},
+        {'type': 'Bloqueo de ruedas', 'severity': 'low', 'base_time': 1.5},
+        {'type': 'Pinchazo', 'severity': 'high', 'base_time': 15},
+        {'type': 'Pérdida de aerodinámica', 'severity': 'medium', 'base_time': 5}
+    ]
+    
+    if track_condition != 'dry':
+        incidents.extend([
+            {'type': 'Hidroplaneo', 'severity': 'high', 'base_time': 10},
+            {'type': 'Visibilidad cero', 'severity': 'medium', 'base_time': 6}
+        ])
+    
+    if tyre_wear > 100:
+        incidents = [i for i in incidents if i['severity'] != 'low']
+    if tyre_wear > 120:
+        incidents = [i for i in incidents if i['severity'] == 'high']
+    
+    return random.choice(incidents)
+
+def calculate_time_lost(incident):
+    return incident['base_time'] + random.random() * incident['base_time'] * 0.5
+
+def get_appropriate_tyre(track_condition):
+    if track_condition == 'dry':
+        return 'soft'
+    elif track_condition == 'light_rain':
+        return 'wet'
+    return 'extreme_wet'
+
+def get_max_wear(tyre_type):
+    max_wear = {
+        'soft': 120, 'medium': 130, 'hard': 140, 
+        'wet': 150, 'extreme_wet': 150
+    }
+    return max_wear.get(tyre_type, 120)
+
+def get_next_tyre(current_tyre, track_condition):
+    if track_condition != 'dry':
+        if current_tyre == 'wet':
+            return 'extreme_wet'
+        return 'wet'
+    
+    sequence = ['soft', 'medium', 'hard']
+    if current_tyre in sequence:
+        current_index = sequence.index(current_tyre)
+        return sequence[(current_index + 1) % len(sequence)]
+    return 'soft'
+
+# Tareas programadas
+scheduler = BackgroundScheduler()
+
+def scheduled_upgrade_completion():
+    with app.app_context():
+        UpgradeSystem.complete_upgrades()
+
+def simulate_scheduled_races():
+    with app.app_context():
+        now = datetime.utcnow()
+        upcoming_races = Race.query.filter(Race.race_session <= now).all()
+        
+        for race in upcoming_races:
+            RaceSimulator.simulate_race(race.id)
+
+def scheduled_training_completion():
+    with app.app_context():
+        TrainingSystem.complete_trainings()
+
+# MOVER ESTAS LÍNEAS AQUÍ, DESPUÉS DE DEFINIR EL SCHEDULER
+scheduler.add_job(scheduled_training_completion, 'interval', hours=1)
+scheduler.add_job(scheduled_upgrade_completion, 'interval', hours=1)
+scheduler.add_job(simulate_scheduled_races, 'interval', minutes=30)
+
+# Solo iniciar el scheduler si estamos ejecutando app.py directamente
+if __name__ == '__main__':
+    scheduler.start()
+    app.run(debug=True)

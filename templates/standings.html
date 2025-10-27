@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clasificaciones - F1 Manager</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .standings-nav { background: #e10600; color: white; }
+        .standings-nav .nav-link { color: white !important; }
+        .standings-nav .nav-link.active { background: #15151e !important; }
+        .driver-standings, .team-standings { display: none; }
+        .standings-table { font-size: 0.9rem; }
+        .fastest-lap { color: #e10600; }
+        .dnf { color: #888; text-decoration: line-through; }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <!-- Navbar -->
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+            <div class="container">
+                <a class="navbar-brand" href="{{ url_for('dashboard') }}">F1 Manager</a>
+                <div class="navbar-nav ms-auto">
+                    <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
+                    <a class="nav-link" href="{{ url_for('standings') }}">Clasificación</a>
+                    <a class="nav-link" href="{{ url_for('calendar') }}">Calendario</a>
+                    <a class="nav-link" href="{{ url_for('logout') }}">Salir</a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+            <h2><i class="fas fa-trophy"></i> Clasificaciones</h2>
+            
+            <!-- Navegación -->
+            <ul class="nav nav-tabs standings-nav" id="standingsTabs">
+                <li class="nav-item">
+                    <a class="nav-link active" href="#" data-bs-target="#drivers-total">Pilotos - Total</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" data-bs-target="#teams-total">Escuderías - Total</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" data-bs-target="#drivers-race">Pilotos por Carrera</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" data-bs-target="#teams-race">Escuderías por Carrera</a>
+                </li>
+            </ul>
+
+            <!-- Contenido de pestañas -->
+            <div class="tab-content mt-3">
+                <!-- Pilotos - Total -->
+                <div class="tab-pane fade show active" id="drivers-total">
+                    <h4>Clasificación de Pilotos - Campeonato Mundial</h4>
+                    <div class="table-responsive">
+                        <table class="table table-striped standings-table">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Pos</th>
+                                    <th>Piloto</th>
+                                    <th>Escudería</th>
+                                    <th>Puntos</th>
+                                    <th>Carreras</th>
+                                </tr>
+                            </thead>
+                            <tbody id="drivers-total-body">
+                                <!-- Los datos se cargan via JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Escuderías - Total -->
+                <div class="tab-pane fade" id="teams-total">
+                    <h4>Clasificación de Escuderías - Campeonato Mundial</h4>
+                    <div class="table-responsive">
+                        <table class="table table-striped standings-table">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Pos</th>
+                                    <th>Escudería</th>
+                                    <th>Puntos</th>
+                                    <th>Carreras</th>
+                                </tr>
+                            </thead>
+                            <tbody id="teams-total-body">
+                                <!-- Los datos se cargan via JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Pilotos por Carrera -->
+                <div class="tab-pane fade" id="drivers-race">
+                    <h4>Clasificación de Pilotos por Carrera</h4>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <select class="form-select" id="race-select-drivers">
+                                <option value="">Selecciona una carrera</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-striped standings-table">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Pos</th>
+                                    <th>Piloto</th>
+                                    <th>Escudería</th>
+                                    <th>Puntos</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="drivers-race-body">
+                                <!-- Los datos se cargan via JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Escuderías por Carrera -->
+                <div class="tab-pane fade" id="teams-race">
+                    <h4>Clasificación de Escuderías por Carrera</h4>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <select class="form-select" id="race-select-teams">
+                                <option value="">Selecciona una carrera</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-striped standings-table">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Pos</th>
+                                    <th>Escudería</th>
+                                    <th>Puntos</th>
+                                </tr>
+                            </thead>
+                            <tbody id="teams-race-body">
+                                <!-- Los datos se cargan via JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Navegación entre pestañas
+        document.querySelectorAll('.standings-nav .nav-link').forEach(tab => {
+            tab.addEventListener('click', function(e) {
+                e.preventDefault();
+                document.querySelectorAll('.standings-nav .nav-link').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('show', 'active'));
+                
+                this.classList.add('active');
+                const target = document.querySelector(this.getAttribute('data-bs-target'));
+                target.classList.add('show', 'active');
+                
+                // Cargar datos cuando se activa la pestaña
+                if (this.getAttribute('data-bs-target') === '#drivers-total') {
+                    loadDriverStandings();
+                } else if (this.getAttribute('data-bs-target') === '#teams-total') {
+                    loadTeamStandings();
+                } else if (this.getAttribute('data-bs-target') === '#drivers-race') {
+                    loadRaces('drivers');
+                } else if (this.getAttribute('data-bs-target') === '#teams-race') {
+                    loadRaces('teams');
+                }
+            });
+        });
+
+        // Cargar clasificación de pilotos (total)
+        async function loadDriverStandings() {
+            const response = await fetch('/api/standings/drivers');
+            const standings = await response.json();
+            
+            const tbody = document.getElementById('drivers-total-body');
+            tbody.innerHTML = '';
+            
+            standings.forEach(standing => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${standing.position}</td>
+                    <td>${standing.driver_name}</td>
+                    <td>${standing.team_name}</td>
+                    <td><strong>${standing.total_points}</strong></td>
+                    <td>${standing.races_entered}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Cargar clasificación de escuderías (total)
+        async function loadTeamStandings() {
+            const response = await fetch('/api/standings/teams');
+            const standings = await response.json();
+            
+            const tbody = document.getElementById('teams-total-body');
+            tbody.innerHTML = '';
+            
+            standings.forEach(standing => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${standing.position}</td>
+                    <td>${standing.team_name}</td>
+                    <td><strong>${standing.total_points}</strong></td>
+                    <td>${standing.races_entered}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Cargar lista de carreras
+        async function loadRaces(type) {
+            const response = await fetch('/api/races');
+            const races = await response.json();
+            
+            const select = document.getElementById(`race-select-${type}`);
+            select.innerHTML = '<option value="">Selecciona una carrera</option>';
+            
+            races.forEach(race => {
+                const option = document.createElement('option');
+                option.value = race.id;
+                option.textContent = `${race.round_number}. ${race.name} (${race.country})`;
+                select.appendChild(option);
+            });
+            
+            // Cuando se selecciona una carrera
+            select.addEventListener('change', function() {
+                if (this.value) {
+                    if (type === 'drivers') {
+                        loadRaceDriverStandings(this.value);
+                    } else {
+                        loadRaceTeamStandings(this.value);
+                    }
+                }
+            });
+        }
+
+        // Cargar clasificación de pilotos por carrera
+        async function loadRaceDriverStandings(raceId) {
+            const response = await fetch(`/api/standings/race/${raceId}/drivers`);
+            const standings = await response.json();
+            
+            const tbody = document.getElementById('drivers-race-body');
+            tbody.innerHTML = '';
+            
+            standings.forEach(standing => {
+                const row = document.createElement('tr');
+                const status = standing.dnf ? 'DNF' : (standing.fastest_lap ? 'Finished 🏁' : 'Finished');
+                const pointsDisplay = standing.fastest_lap ? 
+                    `${standing.points} <span class="fastest-lap" title="Vuelta rápida">⚡</span>` : 
+                    standing.points;
+                
+                row.innerHTML = `
+                    <td>${standing.position}</td>
+                    <td class="${standing.dnf ? 'dnf' : ''}">${standing.driver_name}</td>
+                    <td>${standing.team_name}</td>
+                    <td><strong>${pointsDisplay}</strong></td>
+                    <td>${status}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Cargar clasificación de escuderías por carrera
+        async function loadRaceTeamStandings(raceId) {
+            const response = await fetch(`/api/standings/race/${raceId}/teams`);
+            const standings = await response.json();
+            
+            const tbody = document.getElementById('teams-race-body');
+            tbody.innerHTML = '';
+            
+            standings.forEach(standing => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${standing.position}</td>
+                    <td>${standing.team_name}</td>
+                    <td><strong>${standing.points}</strong></td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Cargar datos iniciales
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDriverStandings();
+            loadRaces('drivers');
+            loadRaces('teams');
+        });
+    </script>
+</body>
+</html>

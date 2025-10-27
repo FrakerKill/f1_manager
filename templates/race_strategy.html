@@ -1,0 +1,588 @@
+{% extends "base.html" %}
+
+{% block title %}Estrategia de Carrera{% endblock %}
+
+{% block content %}
+<h1>Planificar Estrategia - {{ race.circuit.name }}</h1>
+
+<div class="row">
+    <div class="col-md-8">
+        <!-- Información Meteorológica -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>🌤️ Pronóstico Meteorológico para la Carrera</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% set race_weather = weather_forecasts|selectattr("session_type", "equalto", "race")|first %}
+                    {% if race_weather %}
+                    <div class="col-md-4 text-center">
+                        <h4>
+                            {% if race_weather.condition == 'dry' %}🌤️
+                            {% elif race_weather.condition == 'light_rain' %}🌧️
+                            {% else %}⛈️{% endif %}
+                        </h4>
+                        <h5>
+                            {% if race_weather.condition == 'dry' %}Seco
+                            {% elif race_weather.condition == 'light_rain' %}Lluvia Ligera
+                            {% else %}Lluvia Intensa{% endif %}
+                        </h5>
+                        <p class="text-muted">{{ (race_weather.probability * 100)|int }}% de probabilidad</p>
+                    </div>
+                    <div class="col-md-8">
+                        <h6>Posibles Cambios Meteorológicos:</h6>
+                        <div id="weatherChanges">
+                            {% set weather_changes = race.weather_changes|selectattr("session_type", "equalto", "race") %}
+                            {% if weather_changes %}
+                                {% for change in weather_changes %}
+                                <div class="alert alert-{% if change.to_condition == 'dry' %}warning{% elif change.to_condition == 'light_rain' %}info{% else %}primary{% endif %} mb-2">
+                                    <strong>Vuelta {{ change.change_lap }}:</strong> 
+                                    {{ change.from_condition }} → {{ change.to_condition }} 
+                                    ({{ (change.probability * 100)|int }}% probabilidad)
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <p class="text-muted">No se esperan cambios meteorológicos significativos</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="col-12">
+                        <p class="text-muted">Pronóstico no disponible</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5>Configurar Estrategia</h5>
+            </div>
+            <div class="card-body">
+                <form id="strategyForm">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Piloto</label>
+                            <select class="form-select" id="driverSelect" required>
+                                <option value="">Selecciona un piloto</option>
+                                {% for driver in team.drivers %}
+                                <option value="{{ driver.id }}">{{ driver.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Nombre de la Estrategia</label>
+                            <input type="text" class="form-control" id="strategyName" required 
+                                   placeholder="Ej: 1 Parada - Soft/Medium">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Neumático de Salida</label>
+                        <select class="form-select" id="startingTyre" required>
+                            <option value="soft">Blando (Soft) - Máxima velocidad en seco</option>
+                            <option value="medium">Medio (Medium) - Equilibrado en seco</option>
+                            <option value="hard">Duro (Hard) - Duradero en seco</option>
+                            <option value="wet">Lluvia (Wet) - Lluvia ligera</option>
+                            <option value="extreme_wet">Lluvia Extrema - Lluvia intensa</option>
+                        </select>
+                        <div class="form-text" id="startingTyreHelp">
+                            Selecciona el neumático según las condiciones meteorológicas
+                        </div>
+                    </div>
+
+                    <!-- Estrategias Condicionales -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6>🔄 Estrategias para Cambios Meteorológicos</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">Si empieza a llover (lluvia ligera):</label>
+                                <select class="form-select" id="rainStrategy">
+                                    <option value="continue">Continuar con la estrategia actual</option>
+                                    <option value="pit_wet">Entrar a boxes por neumáticos de lluvia (Wet)</option>
+                                    <option value="pit_extreme">Entrar a boxes por neumáticos de lluvia extrema</option>
+                                    <option value="next_pit">Esperar al siguiente pit stop programado</option>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Si la lluvia se intensifica:</label>
+                                <select class="form-select" id="heavyRainStrategy">
+                                    <option value="continue">Continuar con neumáticos actuales</option>
+                                    <option value="pit_extreme">Entrar a boxes por neumáticos de lluvia extrema</option>
+                                    <option value="immediate_pit">Boxes inmediato por seguridad</option>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Si la pista se seca:</label>
+                                <select class="form-select" id="dryStrategy">
+                                    <option value="continue">Continuar con neumáticos actuales</option>
+                                    <option value="pit_soft">Boxes por neumáticos blandos (máxima velocidad)</option>
+                                    <option value="pit_medium">Boxes por neumáticos medios (equilibrado)</option>
+                                    <option value="next_pit">Esperar al siguiente pit stop programado</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-text">
+                                Estas estrategias condicionales se activarán automáticamente durante la carrera
+                                cuando cambien las condiciones meteorológicas.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="strategySegments">
+                        <h6>Segmentos de la Estrategia Base</h6>
+                        <div class="segment-item border rounded p-3 mb-3">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label class="form-label">Neumático</label>
+                                    <select class="form-select segment-tyre" name="segments[0][tyre_type]" required>
+                                        <option value="soft">Blando (Soft)</option>
+                                        <option value="medium">Medio (Medium)</option>
+                                        <option value="hard">Duro (Hard)</option>
+                                        <option value="wet">Lluvia (Wet)</option>
+                                        <option value="extreme_wet">Lluvia Extrema</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Vueltas Planificadas</label>
+                                    <input type="number" class="form-control segment-laps" name="segments[0][laps_planned]" 
+                                           min="1" max="{{ race.circuit.laps }}" value="20" required>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-danger mt-2 remove-segment" style="display: none;">
+                                Eliminar
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="button" class="btn btn-outline-primary mb-3" id="addSegment">
+                        + Añadir Segmento
+                    </button>
+
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h6>Resumen de la Estrategia</h6>
+                            <div id="strategySummary">
+                                <p class="text-muted">Añade segmentos para ver el resumen</p>
+                            </div>
+                            <div id="strategyWarnings"></div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-success mt-3">
+                        💾 Guardar Estrategia para la Carrera
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5>Información de la Carrera</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Circuito:</strong> {{ race.circuit.name }}</p>
+                <p><strong>Vueltas totales:</strong> {{ race.circuit.laps }}</p>
+                <p><strong>Recomendaciones por condiciones:</strong></p>
+                <div id="conditionRecommendations">
+                    {% if race_weather %}
+                        {% if race_weather.condition == 'dry' %}
+                        <ul class="small">
+                            <li><strong>Soft:</strong> 15-25 vueltas (máxima velocidad)</li>
+                            <li><strong>Medium:</strong> 25-40 vueltas (equilibrado)</li>
+                            <li><strong>Hard:</strong> 40-60 vueltas (menos paradas)</li>
+                            <li><strong>Estrategia:</strong> Planifica cambios por si llueve</li>
+                        </ul>
+                        {% elif race_weather.condition == 'light_rain' %}
+                        <ul class="small">
+                            <li><strong>Wet:</strong> Ideal para estas condiciones</li>
+                            <li><strong>Extreme Wet:</strong> Demasiado conservador</li>
+                            <li><strong>Secos:</strong> No recomendados</li>
+                            <li><strong>Estrategia:</strong> Prepárate para cambios</li>
+                        </ul>
+                        {% else %}
+                        <ul class="small">
+                            <li><strong>Extreme Wet:</strong> Obligatorio</li>
+                            <li><strong>Wet:</strong> Riesgo de aquaplaning</li>
+                            <li><strong>Secos:</strong> Peligroso</li>
+                            <li><strong>Estrategia:</strong> Conservadora, espera a que amaine</li>
+                        </ul>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5>Estrategias Guardadas</h5>
+            </div>
+            <div class="card-body">
+                {% for strategy in strategies %}
+                <div class="strategy-item border rounded p-2 mb-2">
+                    <strong>{{ strategy.strategy_name }}</strong>
+                    <small class="text-muted"> - {{ strategy.driver.name }}</small>
+                    <div class="mt-1">
+                        {% for segment in strategy.segments %}
+                        <span class="badge bg-{% if segment.tyre_type == 'soft' %}danger{% elif segment.tyre_type == 'medium' %}warning{% elif segment.tyre_type == 'hard' %}secondary{% elif segment.tyre_type == 'wet' %}info{% else %}primary{% endif %}">
+                            {{ segment.laps_planned }} {{ segment.tyre_type }}
+                        </span>
+                        {% endfor %}
+                    </div>
+                    <div class="mt-1">
+                        <small>Paradas: {{ strategy.total_pit_stops }}</small>
+                        <small class="ms-2">Salida: {{ strategy.starting_tyre }}</small>
+                        <button class="btn btn-sm btn-outline-danger float-end" onclick="deleteStrategy({{ strategy.id }})">
+                            🗑️
+                        </button>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-muted">No hay estrategias guardadas</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5>Guía de Estrategias Meteorológicas</h5>
+            </div>
+            <div class="card-body">
+                <div class="strategy-guide">
+                    <h6>Seco → Lluvia:</h6>
+                    <ul class="small">
+                        <li><strong>Boxes inmediato:</strong> Máxima seguridad</li>
+                        <li><strong>Esperar 1-2 vueltas:</strong> Ver evolución</li>
+                        <li><strong>Riesgo:</strong> Aquaplaning con neumáticos secos</li>
+                    </ul>
+                    
+                    <h6>Lluvia → Seco:</h6>
+                    <ul class="small">
+                        <li><strong>Esperar línea seca:</strong> Mejor momento para cambiar</li>
+                        <li><strong>Boxes temprano:</strong> Ventaja si seca rápido</li>
+                        <li><strong>Riesgo:</strong> Neumáticos de lluvia se destruyen en seco</li>
+                    </ul>
+                    
+                    <h6>Lluvia Intensa:</h6>
+                    <ul class="small">
+                        <li><strong>Coche de seguridad:</strong> Probable</li>
+                        <li><strong>Red Flag:</strong> Posible si es muy intensa</li>
+                        <li><strong>Estrategia:</strong> Conservadora y segura</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let segmentCount = 1;
+    const totalLaps = {{ race.circuit.laps }};
+    const raceWeather = '{{ race_weather.condition if race_weather else "dry" }}';
+
+    // Actualizar recomendaciones según el neumático de salida
+    document.getElementById('startingTyre').addEventListener('change', function() {
+        updateTyreRecommendations();
+    });
+
+    function updateTyreRecommendations() {
+        const startingTyre = document.getElementById('startingTyre').value;
+        const helpText = document.getElementById('startingTyreHelp');
+        
+        const recommendations = {
+            'soft': 'Máxima velocidad en condiciones secas. Ideal para clasificación y inicio de carrera.',
+            'medium': 'Equilibrado entre velocidad y durabilidad. Bueno para condiciones secas.',
+            'hard': 'Alta durabilidad. Menos paradas pero más lento. Solo para seco.',
+            'wet': 'Para lluvia ligera. Buen agarre en mojado pero lento en seco.',
+            'extreme_wet': 'Para lluvia intensa. Máximo agarre en condiciones extremas.'
+        };
+        
+        helpText.textContent = recommendations[startingTyre] || 'Selecciona un neumático apropiado para las condiciones.';
+        
+        // Advertencia si el neumático no coincide con las condiciones
+        if ((raceWeather === 'dry' && ['wet', 'extreme_wet'].includes(startingTyre)) ||
+            (raceWeather === 'light_rain' && ['soft', 'medium', 'hard'].includes(startingTyre)) ||
+            (raceWeather === 'heavy_rain' && startingTyre !== 'extreme_wet')) {
+            helpText.className = 'form-text text-danger';
+            helpText.textContent += ' ⚠️ Neumático inapropiado para las condiciones pronosticadas.';
+        } else {
+            helpText.className = 'form-text text-success';
+        }
+    }
+
+    // Añadir segmento
+    document.getElementById('addSegment').addEventListener('click', function() {
+        const segmentsDiv = document.getElementById('strategySegments');
+        const segmentItem = document.createElement('div');
+        segmentItem.className = 'segment-item border rounded p-3 mb-3';
+        segmentItem.innerHTML = `
+            <div class="row">
+                <div class="col-md-6">
+                    <label class="form-label">Neumático</label>
+                    <select class="form-select segment-tyre" name="segments[${segmentCount}][tyre_type]" required>
+                        <option value="soft">Blando (Soft)</option>
+                        <option value="medium">Medio (Medium)</option>
+                        <option value="hard">Duro (Hard)</option>
+                        <option value="wet">Lluvia (Wet)</option>
+                        <option value="extreme_wet">Lluvia Extrema</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Vueltas Planificadas</label>
+                    <input type="number" class="form-control segment-laps" name="segments[${segmentCount}][laps_planned]" 
+                           min="1" max="${totalLaps}" value="20" required>
+                </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-danger mt-2 remove-segment">
+                Eliminar
+            </button>
+        `;
+        segmentsDiv.appendChild(segmentItem);
+        segmentCount++;
+
+        // Mostrar botones de eliminar en todos los segmentos excepto el primero
+        document.querySelectorAll('.remove-segment').forEach(btn => {
+            btn.style.display = 'block';
+        });
+
+        updateStrategySummary();
+    });
+
+    // Eliminar segmento
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-segment')) {
+            if (segmentCount > 1) {
+                e.target.closest('.segment-item').remove();
+                segmentCount--;
+                updateStrategySummary();
+            }
+            
+            // Ocultar botones de eliminar si solo queda un segmento
+            if (segmentCount === 1) {
+                document.querySelector('.remove-segment').style.display = 'none';
+            }
+        }
+    });
+
+    // Actualizar resumen cuando cambien los inputs
+    document.addEventListener('input', function(e) {
+        if (e.target.classList.contains('segment-laps') || e.target.classList.contains('segment-tyre')) {
+            updateStrategySummary();
+        }
+    });
+
+    function updateStrategySummary() {
+        const segments = document.querySelectorAll('.segment-item');
+        let totalPlannedLaps = 0;
+        let summaryHTML = '';
+        let warningsHTML = '';
+
+        segments.forEach((segment, index) => {
+            const tyreSelect = segment.querySelector('.segment-tyre');
+            const lapsInput = segment.querySelector('.segment-laps');
+            const tyreType = tyreSelect.value;
+            const laps = parseInt(lapsInput.value) || 0;
+            
+            totalPlannedLaps += laps;
+
+            const tyreName = getTyreName(tyreType);
+            const tyreColor = getTyreColor(tyreType);
+            
+            summaryHTML += `
+                <span class="badge bg-${tyreColor} me-1 mb-1">
+                    ${laps} ${tyreName}
+                </span>
+            `;
+
+            // Verificar si el neumático es apropiado para las condiciones
+            if (!isTyreAppropriate(tyreType, raceWeather)) {
+                warningsHTML += `<div class="alert alert-warning mt-2">
+                    <strong>Neumático inapropiado:</strong> ${tyreName} no es ideal para condiciones ${getConditionName(raceWeather)}
+                </div>`;
+            }
+
+            // Verificar duración recomendada
+            const recommendedLaps = getRecommendedLaps(tyreType, raceWeather);
+            if (laps > recommendedLaps.max) {
+                warningsHTML += `<div class="alert alert-danger mt-2">
+                    <strong>Demasiadas vueltas:</strong> ${tyreName} no debería usarse más de ${recommendedLaps.max} vueltas en ${getConditionName(raceWeather)}
+                </div>`;
+            }
+        });
+
+        // Verificar advertencias de vueltas totales
+        if (totalPlannedLaps < totalLaps) {
+            warningsHTML += `<div class="alert alert-warning mt-2">
+                <strong>Faltan vueltas:</strong> Tienes ${totalPlannedLaps}/${totalLaps} vueltas planificadas
+            </div>`;
+        } else if (totalPlannedLaps > totalLaps) {
+            warningsHTML += `<div class="alert alert-danger mt-2">
+                <strong>Demasiadas vueltas:</strong> Tienes ${totalPlannedLaps}/${totalLaps} vueltas planificadas
+            </div>`;
+        }
+
+        const pitStops = segments.length - 1;
+        summaryHTML = `
+            <p><strong>Total vueltas:</strong> ${totalPlannedLaps}/${totalLaps}</p>
+            <p><strong>Paradas en boxes:</strong> ${pitStops}</p>
+            <p><strong>Secuencia:</strong></p>
+            <div>${summaryHTML}</div>
+        `;
+
+        document.getElementById('strategySummary').innerHTML = summaryHTML;
+        document.getElementById('strategyWarnings').innerHTML = warningsHTML;
+    }
+
+    function isTyreAppropriate(tyreType, condition) {
+        if (condition === 'dry') {
+            return ['soft', 'medium', 'hard'].includes(tyreType);
+        } else if (condition === 'light_rain') {
+            return ['wet', 'extreme_wet'].includes(tyreType);
+        } else if (condition === 'heavy_rain') {
+            return tyreType === 'extreme_wet';
+        }
+        return true;
+    }
+
+    function getRecommendedLaps(tyreType, condition) {
+        const recommendations = {
+            'soft': { min: 10, max: 25 },
+            'medium': { min: 20, max: 40 },
+            'hard': { min: 30, max: 60 },
+            'wet': { min: 1, max: 100 },
+            'extreme_wet': { min: 1, max: 100 }
+        };
+        return recommendations[tyreType] || { min: 10, max: 30 };
+    }
+
+    function getTyreColor(tyreType) {
+        const colors = { 
+            'soft': 'danger', 'medium': 'warning', 'hard': 'secondary',
+            'wet': 'info', 'extreme_wet': 'primary'
+        };
+        return colors[tyreType] || 'primary';
+    }
+
+    function getTyreName(tyreType) {
+        const names = { 
+            'soft': 'Blando', 'medium': 'Medio', 'hard': 'Duro',
+            'wet': 'Lluvia', 'extreme_wet': 'Lluvia Extrema'
+        };
+        return names[tyreType] || tyreType;
+    }
+
+    function getConditionName(condition) {
+        const names = { 'dry': 'seco', 'light_rain': 'lluvia ligera', 'heavy_rain': 'lluvia intensa' };
+        return names[condition] || condition;
+    }
+
+    // Enviar formulario
+    document.getElementById('strategyForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const driverId = document.getElementById('driverSelect').value;
+        const strategyName = document.getElementById('strategyName').value;
+        const startingTyre = document.getElementById('startingTyre').value;
+        const rainStrategy = document.getElementById('rainStrategy').value;
+        const heavyRainStrategy = document.getElementById('heavyRainStrategy').value;
+        const dryStrategy = document.getElementById('dryStrategy').value;
+
+        if (!driverId) {
+            alert('Selecciona un piloto');
+            return;
+        }
+
+        // Recolectar segmentos
+        const segments = [];
+        document.querySelectorAll('.segment-item').forEach((segment, index) => {
+            const tyreType = segment.querySelector('.segment-tyre').value;
+            const lapsPlanned = parseInt(segment.querySelector('.segment-laps').value);
+            
+            segments.push({
+                tyre_type: tyreType,
+                laps_planned: lapsPlanned,
+                segment_order: index + 1
+            });
+        });
+
+        // Verificar que la suma de vueltas sea correcta
+        const totalPlannedLaps = segments.reduce((sum, segment) => sum + segment.laps_planned, 0);
+        if (totalPlannedLaps !== totalLaps) {
+            if (!confirm(`La estrategia suma ${totalPlannedLaps} vueltas pero la carrera tiene ${totalLaps}. ¿Continuar igual?`)) {
+                return;
+            }
+        }
+
+        // Enviar datos al servidor
+        fetch('/save_race_strategy', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                race_id: {{ race.id }},
+                driver_id: driverId,
+                strategy_name: strategyName,
+                starting_tyre: startingTyre,
+                rain_strategy: rainStrategy,
+                heavy_rain_strategy: heavyRainStrategy,
+                dry_strategy: dryStrategy,
+                segments: segments
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Estrategia guardada correctamente');
+                location.reload();
+            } else {
+                alert('Error al guardar la estrategia: ' + data.message);
+            }
+        });
+    });
+
+    // Inicializar recomendaciones y resumen
+    updateTyreRecommendations();
+    updateStrategySummary();
+});
+
+function deleteStrategy(strategyId) {
+    if (confirm('¿Estás seguro de que quieres eliminar esta estrategia?')) {
+        fetch(`/delete_strategy/${strategyId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Error al eliminar la estrategia');
+                }
+            });
+    }
+}
+</script>
+
+<style>
+.segment-item {
+    background-color: #f8f9fa;
+}
+.strategy-item {
+    background-color: #f8f9fa;
+}
+.weather-condition {
+    margin-bottom: 10px;
+}
+.strategy-guide h6 {
+    margin-top: 10px;
+    margin-bottom: 5px;
+    font-size: 0.9em;
+}
+</style>
+{% endblock %}

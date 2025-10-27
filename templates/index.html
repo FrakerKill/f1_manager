@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Inicio{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="text-center mb-5">
+            <h1 class="display-4">🏎️ F1 Manager</h1>
+            <p class="lead">Gestiona tu propio equipo de Fórmula 1</p>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <h3 class="card-title text-center">Bienvenido</h3>
+                <p class="card-text text-center">
+                    ¿Estás listo para convertirte en el mejor manager de F1?
+                </p>
+                
+                <div class="d-grid gap-3 mt-4">
+                    <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg">Iniciar Sesión</a>
+                    <a href="{{ url_for('register') }}" class="btn btn-outline-primary btn-lg">Registrarse</a>
+                </div>
+
+                <div class="mt-4">
+                    <h5>Características:</h5>
+                    <ul class="list-unstyled">
+                        <li>✅ Gestiona pilotos, mecánicos e ingenieros</li>
+                        <li>✅ Desarrolla tu coche: motor, aerodinámica, frenos, suspensión</li>
+                        <li>✅ Participa en carreras en tiempo real</li>
+                        <li>✅ Mercado de transferencias</li>
+                        <li>✅ Sistema de mejoras y desarrollo</li>
+                        <li>✅ Calendario de temporada completo</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

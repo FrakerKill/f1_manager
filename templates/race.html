@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}{{ race.circuit.name }}{% endblock %}
+
+{% block content %}
+<h1>Gran Premio de {{ race.circuit.country }}</h1>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <h4>{{ race.circuit.name }}</h4>
+                <p><strong>Vueltas:</strong> {{ race.circuit.laps }}</p>
+                <p><strong>País:</strong> {{ race.circuit.country }}</p>
+                <p><strong>Zona horaria:</strong> {{ race.circuit.timezone }}</p>
+                
+                <div class="mt-4">
+                    <h5>Sesiones:</h5>
+                    <ul class="list-group">
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Tests:</span>
+                            <span data-race-time="{{ race.test_session.isoformat() }}">
+                                {{ race.test_session.strftime('%d/%m/%Y %H:%M') }}
+                            </span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Clasificación:</span>
+                            <span data-race-time="{{ race.qualifying_session.isoformat() }}">
+                                {{ race.qualifying_session.strftime('%d/%m/%Y %H:%M') }}
+                            </span>
+                        </li>
+                        {% if race.sprint_session %}
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Sprint:</span>
+                            <span data-race-time="{{ race.sprint_session.isoformat() }}">
+                                {{ race.sprint_session.strftime('%d/%m/%Y %H:%M') }}
+                            </span>
+                        </li>
+                        {% endif %}
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Carrera:</span>
+                            <span data-race-time="{{ race.race_session.isoformat() }}">
+                                {{ race.race_session.strftime('%d/%m/%Y %H:%M') }}
+                            </span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5>Preparación</h5>
+            </div>
+            <div class="card-body">
+                <p>Prepara tu equipo para la carrera:</p>
+                
+                <div class="d-grid gap-2">
+                    {% if race.race_session <= now %}
+                    <a href="{{ url_for('live_race', race_id=race.id) }}" class="btn btn-success">
+                        Ver Carrera en Directo
+                    </a>
+                    {% else %}
+                    <button class="btn btn-outline-primary" disabled>
+                        Carrera Programada
+                    </button>
+                    <small class="text-muted">Disponible el día de la carrera</small>
+                    {% endif %}
+                    
+                    <a href="{{ url_for('test_session', race_id=race.id) }}" class="btn btn-outline-warning">
+                        Sesión de Tests
+                    </a>
+                    
+                    <a href="{{ url_for('race_strategy', race_id=race.id) }}" class="btn btn-outline-info">
+                        Planificar Estrategia
+                    </a>
+                    
+                    <a href="{{ url_for('upgrades') }}" class="btn btn-outline-secondary">
+                        Desarrollar Mejoras
+                    </a>
+                    
+                    <a href="{{ url_for('team_management') }}" class="btn btn-outline-secondary">
+                        Gestionar Equipo
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5>Información de la Pista</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Longitud:</strong> {{ race.circuit.laps }} vueltas</p>
+                <p><strong>Dificultad:</strong> 
+                    {% if race.circuit.laps > 60 %}Alta{% elif race.circuit.laps > 50 %}Media{% else %}Baja{% endif %}
+                </p>
+                <p><strong>Requisitos:</strong> 
+                    {% if race.circuit.laps > 60 %}Alta fiabilidad{% elif race.circuit.laps > 50 %}Fiabilidad media{% else %}Velocidad pura{% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Actualizar horas locales
+    document.querySelectorAll('[data-race-time]').forEach(element => {
+        const utcTime = element.getAttribute('data-race-time');
+        const localTime = new Date(utcTime).toLocaleString('es-ES');
+        element.textContent = localTime;
+    });
+});
+</script>
+{% endblock %}

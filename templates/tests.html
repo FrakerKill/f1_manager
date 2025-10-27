@@ -1,0 +1,773 @@
+{% extends "base.html" %}
+
+{% block title %}Sesión de Tests{% endblock %}
+
+{% block content %}
+<h1>Sesión de Tests - {{ race.circuit.name }}</h1>
+
+<div class="row">
+    <div class="col-md-8">
+        <!-- Información Meteorológica -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>🌤️ Condiciones Meteorológicas</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Pronóstico para Tests:</strong></p>
+                        {% set test_weather = weather_forecasts|selectattr("session_type", "equalto", "test")|first %}
+                        {% if test_weather %}
+                        <div class="weather-condition">
+                            <span class="badge bg-{% if test_weather.condition == 'dry' %}warning{% elif test_weather.condition == 'light_rain' %}info{% else %}primary{% endif %}">
+                                {% if test_weather.condition == 'dry' %}🌤️ Seco
+                                {% elif test_weather.condition == 'light_rain' %}🌧️ Lluvia Ligera
+                                {% else %}⛈️ Lluvia Intensa{% endif %}
+                            </span>
+                            <small class="text-muted">Probabilidad: {{ (test_weather.probability * 100)|int }}%</small>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Recomendación de Neumáticos:</strong></p>
+                        <div id="tyreRecommendation">
+                            {% if test_weather %}
+                                {% if test_weather.condition == 'dry' %}
+                                <span class="badge bg-success">Usar Secos: Soft/Medium/Hard</span>
+                                {% elif test_weather.condition == 'light_rain' %}
+                                <span class="badge bg-info">Usar Lluvia (Wet)</span>
+                                {% else %}
+                                <span class="badge bg-primary">Usar Lluvia Extrema</span>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5>Configuración del Test</h5>
+            </div>
+            <div class="card-body">
+                <form id="testConfigForm">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Seleccionar Piloto</label>
+                            <select class="form-select" id="driverSelect" required>
+                                <option value="">Selecciona un piloto</option>
+                                {% for driver in team.drivers %}
+                                <option value="{{ driver.id }}" data-skill="{{ driver.skill }}" data-consistency="{{ driver.consistency }}">
+                                    {{ driver.name }} (Habilidad: {{ driver.skill }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Neumático</label>
+                            <select class="form-select" id="tyreSelect" required>
+                                <option value="soft">Blando (Soft) - Mejor en seco</option>
+                                <option value="medium">Medio (Medium) - Equilibrado</option>
+                                <option value="hard">Duro (Hard) - Duradero</option>
+                                <option value="wet">Lluvia (Wet) - Lluvia ligera</option>
+                                <option value="extreme_wet">Lluvia Extrema - Lluvia intensa</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Vueltas a realizar</label>
+                        <input type="number" class="form-control" id="totalLaps" value="20" min="5" max="50" required>
+                        <div class="form-text">Máximo 50 vueltas por sesión de test</div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary" id="startTestBtn">
+                        Iniciar Sesión de Test
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-4" id="testResults" style="display: none;">
+            <div class="card-header">
+                <h5>Resultados del Test</h5>
+            </div>
+            <div class="card-body">
+                <div id="testProgress" class="mb-3">
+                    <div class="progress" style="height: 25px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             id="testProgressBar" style="width: 0%">0%</div>
+                    </div>
+                </div>
+                
+                <div id="lapResults" style="max-height: 400px; overflow-y: auto;">
+                    <!-- Los resultados de las vueltas aparecerán aquí -->
+                </div>
+                
+                <div class="mt-3" id="testSummary" style="display: none;">
+                    <h6>Resumen del Test</h6>
+                    <div id="summaryContent"></div>
+                    <div class="mt-3">
+                        <a href="{{ url_for('race_strategy', race_id=race.id) }}" class="btn btn-success">
+                            Ir a Planificar Estrategia de Carrera
+                        </a>
+                        <button class="btn btn-outline-primary" onclick="location.reload()">
+                            Hacer Otro Test
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5>Información de Neumáticos</h5>
+            </div>
+            <div class="card-body">
+                <div class="tyre-info mb-3 p-3 border rounded">
+                    <h6>Blandos (Soft)</h6>
+                    <small>Seco: ⭐⭐⭐⭐⭐<br>Lluvia: ⭐⭐<br>Durabilidad: ⭐⭐<br>Ideal: 10-20 vueltas secas</small>
+                </div>
+                <div class="tyre-info mb-3 p-3 border rounded">
+                    <h6>Medios (Medium)</h6>
+                    <small>Seco: ⭐⭐⭐⭐<br>Lluvia: ⭐<br>Durabilidad: ⭐⭐⭐<br>Ideal: 20-40 vueltas secas</small>
+                </div>
+                <div class="tyre-info mb-3 p-3 border rounded">
+                    <h6>Duros (Hard)</h6>
+                    <small>Seco: ⭐⭐⭐<br>Lluvia: ⭐<br>Durabilidad: ⭐⭐⭐⭐⭐<br>Ideal: 40-60 vueltas secas</small>
+                </div>
+                <div class="tyre-info mb-3 p-3 border rounded">
+                    <h6>Lluvia (Wet)</h6>
+                    <small>Seco: ⭐⭐<br>Lluvia: ⭐⭐⭐⭐<br>Durabilidad: ⭐⭐⭐⭐⭐<br>Ideal: Lluvia ligera</small>
+                </div>
+                <div class="tyre-info mb-3 p-3 border rounded">
+                    <h6>Lluvia Extrema</h6>
+                    <small>Seco: ⭐<br>Lluvia: ⭐⭐⭐⭐⭐<br>Durabilidad: ⭐⭐⭐⭐⭐<br>Ideal: Lluvia intensa</small>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Historial de Tests -->
+        <div class="card mt-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5>Historial de Tests</h5>
+                <button class="btn btn-sm btn-outline-secondary" id="clearHistoryBtn">Limpiar</button>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <select class="form-select form-select-sm" id="historyFilter">
+                        <option value="all">Todos los tests</option>
+                        <option value="today">Hoy</option>
+                        <option value="week">Esta semana</option>
+                    </select>
+                </div>
+                <div id="testHistory" style="max-height: 300px; overflow-y: auto;">
+                    <!-- El historial aparecerá aquí -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let testData = null;
+    let testHistory = JSON.parse(localStorage.getItem('testHistory')) || [];
+
+    // Mostrar historial al cargar la página
+    displayTestHistory();
+
+    // Iniciar test
+    document.getElementById('testConfigForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const driverSelect = document.getElementById('driverSelect');
+        const selectedOption = driverSelect.options[driverSelect.selectedIndex];
+        const driverSkill = parseInt(selectedOption.getAttribute('data-skill'));
+        const driverConsistency = parseInt(selectedOption.getAttribute('data-consistency'));
+        const driverId = driverSelect.value;
+        const driverName = selectedOption.textContent.split(' (')[0];
+        const tyreType = document.getElementById('tyreSelect').value;
+        const totalLaps = parseInt(document.getElementById('totalLaps').value);
+        
+        // Usar automáticamente las condiciones meteorológicas del pronóstico
+        {% set test_weather = weather_forecasts|selectattr("session_type", "equalto", "test")|first %}
+        const trackCondition = "{{ test_weather.condition if test_weather else 'dry' }}";
+        
+        if (!driverId) {
+            alert('Selecciona un piloto');
+            return;
+        }
+
+        // Mostrar sección de resultados
+        document.getElementById('testResults').style.display = 'block';
+        document.getElementById('startTestBtn').disabled = true;
+
+        // Simular test
+        simulateTest(driverId, driverName, driverSkill, driverConsistency, tyreType, totalLaps, trackCondition);
+    });
+
+    // Limpiar historial
+    document.getElementById('clearHistoryBtn').addEventListener('click', function() {
+        if (confirm('¿Estás seguro de que quieres eliminar todo el historial de tests?')) {
+            localStorage.removeItem('testHistory');
+            testHistory = [];
+            displayTestHistory();
+        }
+    });
+
+    // Filtrar historial
+    document.getElementById('historyFilter').addEventListener('change', function() {
+        displayTestHistory();
+    });
+
+    function displayTestHistory() {
+        const historyContainer = document.getElementById('testHistory');
+        const filter = document.getElementById('historyFilter').value;
+        
+        // Filtrar historial según selección
+        let filteredHistory = testHistory;
+        if (filter === 'today') {
+            const today = new Date().toDateString();
+            filteredHistory = testHistory.filter(test => 
+                new Date(test.timestamp).toDateString() === today
+            );
+        } else if (filter === 'week') {
+            const oneWeekAgo = new Date();
+            oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+            filteredHistory = testHistory.filter(test => 
+                new Date(test.timestamp) >= oneWeekAgo
+            );
+        }
+        
+        if (filteredHistory.length === 0) {
+            historyContainer.innerHTML = '<p class="text-muted text-center">No hay tests en el historial</p>';
+            return;
+        }
+        
+        // Mostrar historial en orden cronológico inverso (más recientes primero)
+        filteredHistory.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        
+        let historyHTML = '';
+        filteredHistory.forEach((test, index) => {
+            const date = new Date(test.timestamp).toLocaleString();
+            const bestLap = Math.min(...test.lapTimes);
+            
+            historyHTML += `
+                <div class="history-item border-bottom p-2 ${index === 0 ? 'bg-light' : ''}">
+                    <div class="d-flex justify-content-between">
+                        <strong>${test.driverName}</strong>
+                        <small class="text-muted">${date}</small>
+                    </div>
+                    <div class="d-flex justify-content-between small">
+                        <span>${test.totalLaps} vueltas</span>
+                        <span>Mejor: ${bestLap.toFixed(3)}s</span>
+                    </div>
+                    <div class="d-flex justify-content-between small">
+                        <span class="badge bg-${getTyreColor(test.initialTyre)}">${getTyreName(test.initialTyre)}</span>
+                        <span class="badge bg-${getConditionColor(test.trackCondition)}">${getConditionName(test.trackCondition)}</span>
+                    </div>
+                    <div class="small text-muted">
+                        ${test.incidents} incidente(s), ${test.pitStops} parada(s)
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary mt-1 w-100" onclick="viewTestDetails(${index})">
+                        Ver Detalles
+                    </button>
+                </div>
+            `;
+        });
+        
+        historyContainer.innerHTML = historyHTML;
+    }
+
+    function saveTestToHistory(testData) {
+        // Limitar el historial a los últimos 50 tests
+        testHistory.unshift(testData);
+        if (testHistory.length > 50) {
+            testHistory = testHistory.slice(0, 50);
+        }
+        
+        localStorage.setItem('testHistory', JSON.stringify(testHistory));
+        displayTestHistory();
+    }
+
+    function simulateTest(driverId, driverName, driverSkill, driverConsistency, initialTyre, totalLaps, trackCondition) {
+        const lapResults = document.getElementById('lapResults');
+        const progressBar = document.getElementById('testProgressBar');
+        lapResults.innerHTML = '';
+        
+        let currentTyre = initialTyre;
+        let tyreWear = 0;
+        let lapTimes = [];
+        let wearData = [];
+        let incidents = 0;
+        let totalTimeLost = 0;
+        let pitStops = 0;
+        let currentTrackCondition = trackCondition;
+
+        // Simular vuelta por vuelta
+        for (let lap = 1; lap <= totalLaps; lap++) {
+            setTimeout(() => {
+                // Posible cambio de condiciones meteorológicas (10% de probabilidad por vuelta)
+                if (Math.random() < 0.1 && lap > 5) {
+                    const conditions = ['dry', 'light_rain', 'heavy_rain'];
+                    currentTrackCondition = conditions[Math.floor(Math.random() * conditions.length)];
+                }
+
+                // Calcular desgaste basado en el neumático y condiciones
+                const baseWearRate = getWearRate(currentTyre, currentTrackCondition);
+                const skillFactor = (100 - driverSkill) / 200;
+                const wearRate = baseWearRate * (1 + skillFactor) + Math.random() * 3;
+                tyreWear += wearRate;
+                
+                // Calcular tiempo de vuelta base según condiciones y neumáticos
+                const baseTime = getBaseTime(currentTyre, currentTrackCondition);
+                const wearPenalty = calculateWearPenalty(tyreWear, currentTyre);
+                const driverTimeBonus = (100 - driverSkill) / 50;
+                
+                let lapTime = baseTime - driverTimeBonus + wearPenalty;
+                let incident = null;
+                let timeLost = 0;
+                let pitStopThisLap = false;
+
+                // Verificar incidentes basados en desgaste y condiciones
+                if (tyreWear > 80 || isWrongTyreForConditions(currentTyre, currentTrackCondition)) {
+                    const incidentChance = calculateIncidentChance(tyreWear, driverConsistency, currentTyre, currentTrackCondition);
+                    if (Math.random() * 100 < incidentChance) {
+                        incident = generateIncident(tyreWear, currentTrackCondition);
+                        timeLost = calculateTimeLost(incident);
+                        lapTime += timeLost;
+                        incidents++;
+                        totalTimeLost += timeLost;
+
+                        // En tests, si hay pinchazo va a boxes y cambia neumáticos
+                        if (incident.type === 'Pinchazo' || incident.type === 'Hidroplaneo') {
+                            pitStopThisLap = true;
+                            // En tests, cambia a neumático apropiado para las condiciones
+                            currentTyre = getAppropriateTyre(currentTrackCondition);
+                            tyreWear = 0;
+                            pitStops++;
+                        }
+                    }
+                }
+
+                // Cambiar neumático si el desgaste es crítico
+                if (tyreWear >= getMaxWear(currentTyre) && !pitStopThisLap) {
+                    currentTyre = getNextTyre(currentTyre, currentTrackCondition);
+                    tyreWear = 0;
+                    pitStops++;
+                }
+                
+                lapTimes.push(lapTime);
+                wearData.push({
+                    lap: lap, 
+                    wear: Math.round(tyreWear), 
+                    tyre: currentTyre,
+                    incident: incident,
+                    timeLost: timeLost,
+                    pitStop: pitStopThisLap,
+                    track_condition: currentTrackCondition
+                });
+                
+                // Mostrar resultado de la vuelta
+                const lapElement = document.createElement('div');
+                let lapClass = 'lap-result border-bottom p-2';
+                let incidentBadge = '';
+                let pitStopBadge = '';
+                let conditionBadge = '';
+                
+                if (tyreWear > 100) {
+                    lapClass += ' bg-danger text-white';
+                } else if (tyreWear > 80) {
+                    lapClass += ' bg-warning';
+                }
+                
+                if (incident) {
+                    incidentBadge = `<span class="badge bg-dark ms-2">${incident.type} +${timeLost.toFixed(1)}s</span>`;
+                }
+                
+                if (pitStopThisLap) {
+                    pitStopBadge = `<span class="badge bg-info ms-2">BOXES (${getTyreName(currentTyre)})</span>`;
+                }
+
+                // Badge de condiciones
+                conditionBadge = `<span class="badge bg-${getConditionColor(currentTrackCondition)} me-2">${getConditionName(currentTrackCondition)}</span>`;
+                
+                lapElement.className = lapClass;
+                lapElement.innerHTML = `
+                    ${conditionBadge}
+                    <strong>Vuelta ${lap}:</strong> 
+                    ${lapTime.toFixed(3)}s - 
+                    <span class="badge bg-${getTyreColor(currentTyre)}">${getTyreName(currentTyre)}</span>
+                    - Desgaste: ${Math.round(tyreWear)}%
+                    ${incidentBadge}
+                    ${pitStopBadge}
+                `;
+                lapResults.appendChild(lapElement);
+                lapResults.scrollTop = lapResults.scrollHeight;
+                
+                // Actualizar progreso
+                const progress = (lap / totalLaps) * 100;
+                progressBar.style.width = `${progress}%`;
+                progressBar.textContent = `${Math.round(progress)}%`;
+                
+                // Mostrar resumen al finalizar
+                if (lap === totalLaps) {
+                    const testSummary = {
+                        driverId,
+                        driverName,
+                        initialTyre,
+                        totalLaps,
+                        incidents,
+                        totalTimeLost,
+                        pitStops,
+                        trackCondition,
+                        lapTimes,
+                        wearData,
+                        timestamp: new Date().toISOString()
+                    };
+                    
+                    showTestSummary(testSummary);
+                    saveTestToHistory(testSummary);
+                    document.getElementById('startTestBtn').disabled = false;
+                }
+            }, lap * 150);
+        }
+        
+        testData = { lapTimes, wearData, initialTyre, totalLaps, incidents, totalTimeLost, pitStops, trackCondition };
+    }
+
+    function getWearRate(tyreType, trackCondition) {
+        const baseRates = { 
+            'soft': 6, 'medium': 4, 'hard': 2.5, 'wet': 3, 'extreme_wet': 2 
+        };
+        let rate = baseRates[tyreType] || 4;
+        
+        // Los neumáticos de seco se desgastan más rápido en mojado
+        if (trackCondition !== 'dry' && ['soft', 'medium', 'hard'].includes(tyreType)) {
+            rate *= 1.5;
+        }
+        
+        return rate;
+    }
+
+    function getBaseTime(tyreType, trackCondition) {
+        const dryTimes = { 'soft': 82, 'medium': 84, 'hard': 86, 'wet': 95, 'extreme_wet': 98 };
+        let baseTime = dryTimes[tyreType] || 84;
+        
+        // Ajustar por condiciones
+        if (trackCondition === 'light_rain') {
+            if (['soft', 'medium', 'hard'].includes(tyreType)) {
+                baseTime += 15; // Mucho más lento con neumáticos de seco en lluvia
+            } else if (tyreType === 'wet') {
+                baseTime += 2; // Ligera penalización con lluvia
+            } else {
+                baseTime += 5; // Penalización con lluvia extrema en lluvia ligera
+            }
+        } else if (trackCondition === 'heavy_rain') {
+            if (['soft', 'medium', 'hard'].includes(tyreType)) {
+                baseTime += 25; // Muy lento con neumáticos de seco en lluvia intensa
+            } else if (tyreType === 'wet') {
+                baseTime += 8; // Penalización con lluvia en lluvia intensa
+            } else {
+                baseTime += 3; // Mínima penalización con lluvia extrema
+            }
+        }
+        
+        return baseTime;
+    }
+	
+    function calculateWearPenalty(tyreWear, tyreType) {
+        if (tyreWear <= 50) {
+            return 0;
+        } else if (tyreWear <= 80) {
+            return (tyreWear - 50) * 0.1;
+        } else if (tyreWear <= 100) {
+            return 3 + (tyreWear - 80) * 0.2;
+        } else {
+            return 7 + (tyreWear - 100) * 0.3;
+        }
+    }
+
+    function isWrongTyreForConditions(tyreType, trackCondition) {
+        if (trackCondition === 'dry') {
+            return ['wet', 'extreme_wet'].includes(tyreType);
+        } else if (trackCondition === 'light_rain') {
+            return ['soft', 'medium', 'hard'].includes(tyreType);
+        } else if (trackCondition === 'heavy_rain') {
+            return tyreType !== 'extreme_wet';
+        }
+        return false;
+    }
+
+    function calculateIncidentChance(tyreWear, driverConsistency, tyreType, trackCondition) {
+        let baseChance = 0;
+        
+        if (tyreWear > 120) baseChance = 40;
+        else if (tyreWear > 100) baseChance = 25;
+        else if (tyreWear > 90) baseChance = 15;
+        else if (tyreWear > 80) baseChance = 8;
+        
+        // Neumáticos incorrectos para las condiciones aumentan mucho el riesgo
+        if (isWrongTyreForConditions(tyreType, trackCondition)) {
+            baseChance *= 3;
+        }
+        
+        // Los neumáticos blandos tienen más riesgo
+        if (tyreType === 'soft') baseChance *= 1.3;
+        else if (tyreType === 'medium') baseChance *= 1.1;
+        
+        // La consistencia del piloto reduce el riesgo
+        const consistencyFactor = (100 - driverConsistency) / 100;
+        return baseChance * (1 + consistencyFactor * 0.5);
+    }
+
+    function generateIncident(tyreWear, trackCondition) {
+        let incidents = [
+            { type: 'Trompo', severity: 'medium', baseTime: 3 },
+            { type: 'Salida de pista', severity: 'low', baseTime: 2 },
+            { type: 'Bloqueo de ruedas', severity: 'low', baseTime: 1.5 },
+            { type: 'Pinchazo', severity: 'high', baseTime: 15 },
+            { type: 'Pérdida de aerodinámica', severity: 'medium', baseTime: 5 }
+        ];
+        
+        // Añadir incidentes específicos de lluvia
+        if (trackCondition !== 'dry') {
+            incidents.push(
+                { type: 'Hidroplaneo', severity: 'high', baseTime: 10 },
+                { type: 'Visibilidad cero', severity: 'medium', baseTime: 6 }
+            );
+        }
+        
+        let incidentPool = incidents;
+        if (tyreWear > 100) {
+            incidentPool = incidents.filter(i => i.severity !== 'low');
+        }
+        if (tyreWear > 120) {
+            incidentPool = incidents.filter(i => i.severity === 'high');
+        }
+        
+        const incident = incidentPool[Math.floor(Math.random() * incidentPool.length)];
+        return {
+            type: incident.type,
+            severity: incident.severity,
+            baseTime: incident.baseTime
+        };
+    }
+
+    function calculateTimeLost(incident) {
+        return incident.baseTime + Math.random() * incident.baseTime * 0.5;
+    }
+
+    function getAppropriateTyre(trackCondition) {
+        if (trackCondition === 'dry') return 'soft';
+        if (trackCondition === 'light_rain') return 'wet';
+        return 'extreme_wet';
+    }
+
+    function getMaxWear(tyreType) {
+        const maxWear = { 'soft': 120, 'medium': 130, 'hard': 140, 'wet': 150, 'extreme_wet': 150 };
+        return maxWear[tyreType] || 120;
+    }
+
+    function getNextTyre(currentTyre, trackCondition) {
+        if (trackCondition !== 'dry') {
+            // En mojado, solo cambiar entre neumáticos de lluvia
+            if (currentTyre === 'wet') return 'extreme_wet';
+            return 'wet';
+        }
+        
+        // En seco, secuencia normal
+        const sequence = ['soft', 'medium', 'hard'];
+        const currentIndex = sequence.indexOf(currentTyre);
+        return sequence[(currentIndex + 1) % sequence.length];
+    }
+
+    function getTyreColor(tyreType) {
+        const colors = { 
+            'soft': 'danger', 'medium': 'warning', 'hard': 'secondary',
+            'wet': 'info', 'extreme_wet': 'primary'
+        };
+        return colors[tyreType] || 'primary';
+    }
+
+    function getTyreName(tyreType) {
+        const names = { 
+            'soft': 'Blando', 'medium': 'Medio', 'hard': 'Duro',
+            'wet': 'Lluvia', 'extreme_wet': 'Lluvia Extrema'
+        };
+        return names[tyreType] || tyreType;
+    }
+
+    function getConditionColor(condition) {
+        const colors = { 'dry': 'warning', 'light_rain': 'info', 'heavy_rain': 'primary' };
+        return colors[condition] || 'secondary';
+    }
+
+    function getConditionName(condition) {
+        const names = { 'dry': '🌤️ Seco', 'light_rain': '🌧️ Lluvia Ligera', 'heavy_rain': '⛈️ Lluvia Intensa' };
+        return names[condition] || condition;
+    }
+
+    function showTestSummary(testSummary) {
+        const summary = document.getElementById('testSummary');
+        const content = document.getElementById('summaryContent');
+        
+        const avgLapTime = testSummary.lapTimes.reduce((a, b) => a + b, 0) / testSummary.lapTimes.length;
+        const bestLap = Math.min(...testSummary.lapTimes);
+        const worstLap = Math.max(...testSummary.lapTimes);
+        
+        // Analizar datos de desgaste para recomendaciones
+        const maxWear = Math.max(...testSummary.wearData.map(w => w.wear));
+        const pinchazos = testSummary.wearData.filter(w => w.incident && (w.incident.type === 'Pinchazo' || w.incident.type === 'Hidroplaneo')).length;
+        const wrongTyreIncidents = testSummary.wearData.filter(w => isWrongTyreForConditions(w.tyre, w.track_condition)).length;
+        
+        let recommendations = '';
+        if (pinchazos > 0) {
+            recommendations += `<div class="alert alert-danger">
+                <strong>¡Cuidado!</strong> Tuviste ${pinchazos} incidente(s) graves. Considera cambiar neumáticos antes en carrera.
+            </div>`;
+        }
+        if (wrongTyreIncidents > 0) {
+            recommendations += `<div class="alert alert-warning">
+                <strong>Neumáticos incorrectos:</strong> ${wrongTyreIncidents} vueltas con neumáticos inapropiados para las condiciones.
+            </div>`;
+        }
+        if (maxWear > 100) {
+            recommendations += `<div class="alert alert-warning">
+                <strong>Desgaste elevado:</strong> Llegaste a ${maxWear}% de desgaste. Reduce la duración de las tandas en carrera.
+            </div>`;
+        }
+
+        content.innerHTML = `
+            <p><strong>Piloto:</strong> ${testSummary.driverName}</p>
+            <p><strong>Condiciones de prueba:</strong> ${getConditionName(testSummary.trackCondition)}</p>
+            <p><strong>Neumático inicial:</strong> ${getTyreName(testSummary.initialTyre)}</p>
+            <p><strong>Vueltas totales:</strong> ${testSummary.lapTimes.length}</p>
+            <p><strong>Mejor vuelta:</strong> ${bestLap.toFixed(3)}s</p>
+            <p><strong>Peor vuelta:</strong> ${worstLap.toFixed(3)}s</p>
+            <p><strong>Tiempo promedio:</strong> ${avgLapTime.toFixed(3)}s</p>
+            <p><strong>Paradas en boxes:</strong> ${testSummary.pitStops}</p>
+            <p><strong>Incidentes:</strong> ${testSummary.incidents}</p>
+            <p><strong>Tiempo perdido por incidentes:</strong> ${testSummary.totalTimeLost.toFixed(1)}s</p>
+            <p><strong>Desgaste máximo alcanzado:</strong> ${maxWear}%</p>
+            ${recommendations}
+            <div class="alert alert-info">
+                <strong>Recuerda:</strong> En tests los pilotos vuelven a boxes tras incidentes y continúan. 
+                En carrera seguirán la estrategia planificada salvo incidentes graves.
+            </div>
+        `;
+        
+        summary.style.display = 'block';
+    }
+});
+
+// Función global para ver detalles de un test (se llama desde el historial)
+function viewTestDetails(index) {
+    const testHistory = JSON.parse(localStorage.getItem('testHistory')) || [];
+    const test = testHistory[index];
+    
+    if (!test) return;
+    
+    // Crear un modal para mostrar los detalles del test
+    const modalHTML = `
+        <div class="modal fade" id="testDetailsModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Detalles del Test - ${test.driverName}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <p><strong>Fecha:</strong> ${new Date(test.timestamp).toLocaleString()}</p>
+                                <p><strong>Neumático inicial:</strong> ${getTyreName(test.initialTyre)}</p>
+                                <p><strong>Condiciones:</strong> ${getConditionName(test.trackCondition)}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Vueltas:</strong> ${test.totalLaps}</p>
+                                <p><strong>Paradas:</strong> ${test.pitStops}</p>
+                                <p><strong>Incidentes:</strong> ${test.incidents}</p>
+                            </div>
+                        </div>
+                        <h6>Vueltas del Test:</h6>
+                        <div style="max-height: 400px; overflow-y: auto;">
+                            ${test.wearData.map(lap => `
+                                <div class="lap-result border-bottom p-2">
+                                    <strong>Vuelta ${lap.lap}:</strong> 
+                                    ${test.lapTimes[lap.lap-1].toFixed(3)}s - 
+                                    <span class="badge bg-${getTyreColor(lap.tyre)}">${getTyreName(lap.tyre)}</span>
+                                    - Desgaste: ${lap.wear}%
+                                    ${lap.incident ? `<span class="badge bg-dark ms-2">${lap.incident.type} +${lap.timeLost.toFixed(1)}s</span>` : ''}
+                                    ${lap.pitStop ? `<span class="badge bg-info ms-2">BOXES</span>` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Añadir el modal al DOM si no existe
+    let modal = document.getElementById('testDetailsModal');
+    if (modal) {
+        modal.remove();
+    }
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Mostrar el modal
+    const modalElement = new bootstrap.Modal(document.getElementById('testDetailsModal'));
+    modalElement.show();
+}
+
+// Funciones auxiliares para el modal (necesitan ser globales)
+function getTyreColor(tyreType) {
+    const colors = { 
+        'soft': 'danger', 'medium': 'warning', 'hard': 'secondary',
+        'wet': 'info', 'extreme_wet': 'primary'
+    };
+    return colors[tyreType] || 'primary';
+}
+
+function getTyreName(tyreType) {
+    const names = { 
+        'soft': 'Blando', 'medium': 'Medio', 'hard': 'Duro',
+        'wet': 'Lluvia', 'extreme_wet': 'Lluvia Extrema'
+    };
+    return names[tyreType] || tyreType;
+}
+
+function getConditionName(condition) {
+    const names = { 'dry': '🌤️ Seco', 'light_rain': '🌧️ Lluvia Ligera', 'heavy_rain': '⛈️ Lluvia Intensa' };
+    return names[condition] || condition;
+}
+</script>
+
+<style>
+.lap-result {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+}
+.tyre-info {
+    background-color: #f8f9fa;
+}
+.weather-condition {
+    margin-bottom: 10px;
+}
+.history-item {
+    transition: background-color 0.2s;
+}
+.history-item:hover {
+    background-color: #f8f9fa;
+}
+</style>
+{% endblock %}

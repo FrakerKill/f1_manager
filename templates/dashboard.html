@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <h1>Dashboard - {{ current_user.team_name }}</h1>
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Finanzas</h5>
+                <p class="card-text">Presupuesto: <strong>€{{ "{:,.0f}".format(current_user.money) }}</strong></p>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Pilotos ({{ team.drivers|length }}/2)</h5>
+                        {% for driver in team.drivers %}
+                        <div class="driver-card mb-2 p-2 border rounded">
+                            <strong>{{ driver.name }}</strong><br>
+                            Habilidad: {{ driver.skill }}<br>
+                            Experiencia: {{ driver.experience }}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Coche</h5>
+                        {% for component in team.car_components %}
+                        <div class="component-card mb-2 p-2 border rounded">
+                            <strong>{{ component.component_type|title }}</strong><br>
+                            Fuerza: {{ component.strength }}<br>
+                            Fiabilidad: {{ component.reliability }}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <!-- Próximo Evento con Cuenta Atrás -->
+        <div class="card border-warning">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0">⏰ Próximo Evento</h5>
+            </div>
+            <div class="card-body">
+                {% if next_event %}
+                <div class="text-center">
+                    <h6 class="text-primary">{{ next_event.circuit.name }}</h6>
+                    <p class="mb-1">
+                        <small class="text-muted">
+                            {{ next_event.circuit.country }}<br>
+                            {{ next_event.session_type|title }} - 
+                            {{ next_event.session_datetime.strftime('%d/%m/%Y %H:%M') }}
+                        </small>
+                    </p>
+                    
+                    <!-- Cuenta atrás -->
+                    <div id="countdown-timer" class="countdown-container mb-3">
+                        <div class="row text-center">
+                            <div class="col-3">
+                                <div class="countdown-box">
+                                    <span id="countdown-days" class="countdown-number">00</span>
+                                    <small class="countdown-label">Días</small>
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <div class="countdown-box">
+                                    <span id="countdown-hours" class="countdown-number">00</span>
+                                    <small class="countdown-label">Horas</small>
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <div class="countdown-box">
+                                    <span id="countdown-minutes" class="countdown-number">00</span>
+                                    <small class="countdown-label">Minutos</small>
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <div class="countdown-box">
+                                    <span id="countdown-seconds" class="countdown-number">00</span>
+                                    <small class="countdown-label">Segundos</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="event-actions">
+                        {% if next_event.session_type == 'test' %}
+                        <a href="{{ url_for('test_session', race_id=next_event.race_id) }}" class="btn btn-sm btn-outline-primary w-100 mb-1">
+                            Preparar Tests
+                        </a>
+                        {% elif next_event.session_type == 'qualifying' %}
+                        <a href="{{ url_for('race_strategy', race_id=next_event.race_id) }}" class="btn btn-sm btn-outline-success w-100 mb-1">
+                            Estrategia Clasificación
+                        </a>
+                        {% elif next_event.session_type == 'race' %}
+                        <a href="{{ url_for('race_strategy', race_id=next_event.race_id) }}" class="btn btn-sm btn-outline-danger w-100 mb-1">
+                            Estrategia Carrera
+                        </a>
+                        {% endif %}
+                        <a href="{{ url_for('race_details', race_id=next_event.race_id) }}" class="btn btn-sm btn-outline-secondary w-100">
+                            Ver Detalles
+                        </a>
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center text-muted">
+                    <p>No hay eventos próximos</p>
+                    <a href="{{ url_for('calendar') }}" class="btn btn-sm btn-outline-primary">
+                        Ver Calendario Completo
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-body">
+                <h5 class="card-title">Acciones Rápidas</h5>
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('market') }}" class="btn btn-outline-primary">Mercado de Transferencias</a>
+                    <a href="{{ url_for('upgrades') }}" class="btn btn-outline-success">Desarrollar Mejoras</a>
+					<a href="{{ url_for('training') }}" class="btn btn-outline-warning">Entrenar Personal</a>
+                    <a href="{{ url_for('team_management') }}" class="btn btn-outline-info">Gestionar Equipo</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Script para la cuenta atrás -->
+{% if next_event %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const eventDate = new Date("{{ next_event.session_datetime.isoformat() }}").getTime();
+    
+    function updateCountdown() {
+        const now = new Date().getTime();
+        const distance = eventDate - now;
+        
+        if (distance < 0) {
+            // El evento ya pasó
+            document.getElementById('countdown-days').textContent = '00';
+            document.getElementById('countdown-hours').textContent = '00';
+            document.getElementById('countdown-minutes').textContent = '00';
+            document.getElementById('countdown-seconds').textContent = '00';
+            
+            // Actualizar la interfaz para mostrar que el evento está en curso
+            document.querySelector('.card-header h5').innerHTML = '🎯 Evento en Curso';
+            return;
+        }
+        
+        // Calcular días, horas, minutos y segundos
+        const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+        
+        // Actualizar display
+        document.getElementById('countdown-days').textContent = days.toString().padStart(2, '0');
+        document.getElementById('countdown-hours').textContent = hours.toString().padStart(2, '0');
+        document.getElementById('countdown-minutes').textContent = minutes.toString().padStart(2, '0');
+        document.getElementById('countdown-seconds').textContent = seconds.toString().padStart(2, '0');
+    }
+    
+    // Actualizar cada segundo
+    updateCountdown();
+    setInterval(updateCountdown, 1000);
+});
+</script>
+
+<style>
+.countdown-container {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-radius: 10px;
+    padding: 15px;
+    border: 2px solid #dee2e6;
+}
+
+.countdown-box {
+    background: white;
+    border-radius: 8px;
+    padding: 8px 5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: 1px solid #dee2e6;
+}
+
+.countdown-number {
+    font-size: 1.4rem;
+    font-weight: bold;
+    color: #dc3545;
+    display: block;
+    line-height: 1.2;
+}
+
+.countdown-label {
+    font-size: 0.7rem;
+    color: #6c757d;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.event-actions .btn {
+    font-size: 0.8rem;
+    padding: 4px 8px;
+}
+</style>
+{% endif %}
+{% endblock %}

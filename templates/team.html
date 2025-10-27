@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+
+{% block title %}Mi Equipo{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="mb-4">Mi Equipo - {{ team.team_name }}</h1>
+
+    <!-- Estadísticas rápidas del equipo -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body py-3">
+                    <div class="row text-center">
+                        <div class="col-md-2">
+                            <h4 class="text-primary">€{{ "{:,.0f}".format(current_user.money) }}</h4>
+                            <small class="text-muted">Presupuesto Actual</small>
+                        </div>
+                        <div class="col-md-2">
+                            <h4>{{ team.drivers|length }}/2</h4>
+                            <small class="text-muted">Pilotos</small>
+                        </div>
+                        <div class="col-md-2">
+                            <h4>{{ team.mechanics|length }}/4</h4>
+                            <small class="text-muted">Mecánicos</small>
+                        </div>
+                        <div class="col-md-2">
+                            <h4>{{ team.engineers|length }}/4</h4>
+                            <small class="text-muted">Ingenieros</small>
+                        </div>
+                        <div class="col-md-2">
+                            <h4>
+                                {% set total_strength = team.car_components|sum(attribute='strength') %}
+                                {{ (total_strength / 4)|round|int }}
+                            </h4>
+                            <small class="text-muted">Fuerza Promedio</small>
+                        </div>
+                        <div class="col-md-2">
+                            <h4>
+                                {% set total_reliability = team.car_components|sum(attribute='reliability') %}
+                                {{ (total_reliability / 4)|round|int }}
+                            </h4>
+                            <small class="text-muted">Fiabilidad Promedio</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Pilotos -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5>Pilotos ({{ team.drivers|length }}/2)</h5>
+                    <a href="{{ url_for('market') }}" class="btn btn-sm btn-primary">Contratar</a>
+                </div>
+                <div class="card-body">
+                    {% for driver in team.drivers %}
+                    <div class="driver-card border rounded p-3 mb-3">
+                        <h6>{{ driver.name }}</h6>
+                        <div class="row">
+                            <div class="col-6">
+                                <small>Edad: {{ driver.age }}</small><br>
+                                <small>Salario: €{{ "%.0f"|format(driver.salary) }}</small>
+                            </div>
+                            <div class="col-6">
+                                <small>Habilidad: {{ driver.skill }}</small><br>
+                                <small>Experiencia: {{ driver.experience }}</small>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <div class="progress mb-1" style="height: 8px;">
+                                <div class="progress-bar bg-success" style="width: {{ driver.skill }}%;"></div>
+                            </div>
+                            <small class="text-muted">Habilidad</small>
+                            
+                            <div class="progress mb-1" style="height: 8px;">
+                                <div class="progress-bar bg-info" style="width: {{ driver.experience }}%;"></div>
+                            </div>
+                            <small class="text-muted">Experiencia</small>
+                            
+                            <div class="progress mb-1" style="height: 8px;">
+                                <div class="progress-bar bg-warning" style="width: {{ driver.aggression }}%;"></div>
+                            </div>
+                            <small class="text-muted">Agresividad</small>
+                            
+                            <div class="progress mb-1" style="height: 8px;">
+                                <div class="progress-bar bg-primary" style="width: {{ driver.consistency }}%;"></div>
+                            </div>
+                            <small class="text-muted">Consistencia</small>
+                        </div>
+                        {% if driver.age >= 40 %}
+                        <div class="alert alert-warning mt-2 py-1">
+                            <small>¡Piloto cerca de la jubilación!</small>
+                        </div>
+                        {% endif %}
+                        <button class="btn btn-sm btn-outline-danger mt-2 fire-btn" 
+                                data-type="driver" 
+                                data-id="{{ driver.id }}">
+                            Despedir
+                        </button>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No tienes pilotos contratados</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Personal -->
+        <div class="col-md-6">
+            <!-- Mecánicos -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5>Mecánicos ({{ team.mechanics|length }}/4)</h5>
+                    <a href="{{ url_for('market') }}" class="btn btn-sm btn-primary">Contratar</a>
+                </div>
+                <div class="card-body">
+                    {% for mechanic in team.mechanics %}
+                    <div class="mechanic-card border rounded p-3 mb-3">
+                        <strong>{{ mechanic.name }}</strong>
+                        <div class="row mt-2">
+                            <div class="col-6">
+                                <small>Edad: {{ mechanic.age }}</small><br>
+                                <small>Salario: €{{ "%.0f"|format(mechanic.salary) }}</small>
+                            </div>
+                            <div class="col-6">
+                                <small>Boxes: {{ mechanic.pit_stop_skill }}</small><br>
+                                <small>Fiabilidad: {{ mechanic.reliability_skill }}</small>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <div class="progress mb-1" style="height: 8px;">
+                                <div class="progress-bar bg-success" style="width: {{ mechanic.pit_stop_skill }}%;"></div>
+                            </div>
+                            <small class="text-muted">Habilidad en Boxes</small>
+                            
+                            <div class="progress mb-1" style="height: 8px;">
+                                <div class="progress-bar bg-info" style="width: {{ mechanic.reliability_skill }}%;"></div>
+                            </div>
+                            <small class="text-muted">Fiabilidad</small>
+                        </div>
+                        <button class="btn btn-sm btn-outline-danger mt-2 fire-btn" 
+                                data-type="mechanic" 
+                                data-id="{{ mechanic.id }}">
+                            Despedir
+                        </button>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No tienes mecánicos</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Ingenieros -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5>Ingenieros ({{ team.engineers|length }}/4)</h5>
+                    <a href="{{ url_for('market') }}" class="btn btn-sm btn-primary">Contratar</a>
+                </div>
+                <div class="card-body">
+                    {% for engineer in team.engineers %}
+                    <div class="engineer-card border rounded p-3 mb-3">
+                        <strong>{{ engineer.name }}</strong>
+                        <div class="row mt-2">
+                            <div class="col-6">
+                                <small>Edad: {{ engineer.age }}</small><br>
+                                <small>Salario: €{{ "%.0f"|format(engineer.salary) }}</small>
+                            </div>
+                            <div class="col-6">
+                                <small>Innovación: {{ engineer.innovation }}</small><br>
+                                <small>Velocidad: {{ engineer.development_speed }}</small>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <div class="progress mb-1" style="height: 8px;">
+                                <div class="progress-bar bg-success" style="width: {{ engineer.innovation }}%;"></div>
+                            </div>
+                            <small class="text-muted">Innovación</small>
+                            
+                            <div class="progress mb-1" style="height: 8px;">
+                                <div class="progress-bar bg-info" style="width: {{ engineer.development_speed }}%;"></div>
+                            </div>
+                            <small class="text-muted">Velocidad de Desarrollo</small>
+                        </div>
+                        {% if engineer.age >= 70 %}
+                        <div class="alert alert-warning mt-2 py-1">
+                            <small>¡Ingeniero cerca de la jubilación!</small>
+                        </div>
+                        {% endif %}
+                        <button class="btn btn-sm btn-outline-danger mt-2 fire-btn" 
+                                data-type="engineer" 
+                                data-id="{{ engineer.id }}">
+                            Despedir
+                        </button>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No tienes ingenieros</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Componentes del Coche -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Componentes del Coche</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for component in team.car_components %}
+                        <div class="col-md-3">
+                            <div class="component-card border rounded p-3 text-center">
+                                <h6>{{ component.component_type|title }}</h6>
+                                <div class="progress mb-2" style="height: 20px;">
+                                    <div class="progress-bar bg-success" style="width: {{ component.strength }}%;">
+                                        {{ component.strength }}
+                                    </div>
+                                </div>
+                                <small class="text-muted">Fuerza</small>
+                                
+                                <div class="progress mb-2" style="height: 20px;">
+                                    <div class="progress-bar bg-warning" style="width: {{ component.reliability }}%;">
+                                        {{ component.reliability }}
+                                    </div>
+                                </div>
+                                <small class="text-muted">Fiabilidad</small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.fire-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const type = this.dataset.type;
+            const id = this.dataset.id;
+            const typeNames = {
+                'driver': 'piloto',
+                'mechanic': 'mecánico',
+                'engineer': 'ingeniero'
+            };
+            
+            if (confirm(`¿Estás seguro de que quieres despedir a este ${typeNames[type]}?`)) {
+                fetch(`/fire/${type}/${id}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert(data.message);
+                            location.reload();
+                        } else {
+                            alert(data.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Error al despedir');
+                    });
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

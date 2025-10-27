@@ -1,0 +1,467 @@
+{% extends "base.html" %}
+
+{% block title %}Entrenamiento{% endblock %}
+
+{% block content %}
+<h1>Programa de Entrenamiento</h1>
+
+<!-- Información del equipo -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-4">
+                        <h4 class="text-primary">€{{ "{:,.0f}".format(current_user.money) }}</h4>
+                        <small class="text-muted">Presupuesto Disponible</small>
+                    </div>
+                    <div class="col-md-4">
+                        <h4>{{ team.drivers|length }}/2</h4>
+                        <small class="text-muted">Pilotos</small>
+                    </div>
+                    <div class="col-md-4">
+                        <h4>{{ team.mechanics|length + team.engineers|length }}</h4>
+                        <small class="text-muted">Personal Total</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <!-- Pestañas para diferentes tipos de personal -->
+        <ul class="nav nav-tabs mb-3" id="trainingTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="drivers-tab" data-bs-toggle="tab" data-bs-target="#drivers" type="button" role="tab">
+                    🏎️ Pilotos
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="mechanics-tab" data-bs-toggle="tab" data-bs-target="#mechanics" type="button" role="tab">
+                    🔧 Mecánicos
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="engineers-tab" data-bs-toggle="tab" data-bs-target="#engineers" type="button" role="tab">
+                    📊 Ingenieros
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="trainingTabsContent">
+            <!-- Pestaña de Pilotos -->
+            <div class="tab-pane fade show active" id="drivers" role="tabpanel">
+                {% for driver in team.drivers %}
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">{{ driver.name }} ({{ driver.age }} años)</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <small>Habilidad: <strong>{{ driver.skill }}/100</strong></small>
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar bg-primary" style="width: {{ driver.skill }}%;"></div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <small>Experiencia: <strong>{{ driver.experience }}/100</strong></small>
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar bg-info" style="width: {{ driver.experience }}%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <small>Agresividad: <strong>{{ driver.aggression }}/100</strong></small>
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar bg-warning" style="width: {{ driver.aggression }}%;"></div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <small>Consistencia: <strong>{{ driver.consistency }}/100</strong></small>
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar bg-success" style="width: {{ driver.consistency }}%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {% if not active_training %}
+                        <form class="training-form">
+                            <input type="hidden" name="staff_type" value="driver">
+                            <input type="hidden" name="staff_id" value="{{ driver.id }}">
+                            
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <label class="form-label"><small><strong>Atributo a Mejorar:</strong></small></label>
+                                    <select name="attribute" class="form-select form-select-sm">
+                                        <option value="skill">Habilidad</option>
+                                        <option value="experience">Experiencia</option>
+                                        <option value="aggression">Agresividad</option>
+                                        <option value="consistency">Consistencia</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label"><small><strong>Nivel:</strong></small></label>
+                                    <select name="level" class="form-select form-select-sm level-select">
+                                        <option value="1" data-cost="200000">Nivel 1 (+3)</option>
+                                        <option value="2" data-cost="400000">Nivel 2 (+6)</option>
+                                        <option value="3" data-cost="600000">Nivel 3 (+9)</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label"><small><strong>Duración:</strong></small></label>
+                                    <select name="weeks" class="form-select form-select-sm weeks-select">
+                                        <option value="1" data-cost="200000">1 semana</option>
+                                        <option value="2" data-cost="400000">2 semanas</option>
+                                        <option value="3" data-cost="600000">3 semanas</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-3 p-2 bg-light rounded">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <strong>Costo Total:</strong>
+                                    <span id="total_cost_driver_{{ driver.id }}" class="badge bg-success fs-6">
+                                        €400,000
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-success btn-sm w-100 mt-2">
+                                Iniciar Entrenamiento
+                            </button>
+                        </form>
+                        {% else %}
+                        <div class="text-center text-muted py-2">
+                            <small>Otro entrenamiento en progreso</small>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Pestaña de Mecánicos -->
+            <div class="tab-pane fade" id="mechanics" role="tabpanel">
+                {% for mechanic in team.mechanics %}
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">{{ mechanic.name }} ({{ mechanic.age }} años)</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <small>Habilidad en Boxes: <strong>{{ mechanic.pit_stop_skill }}/100</strong></small>
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar bg-primary" style="width: {{ mechanic.pit_stop_skill }}%;"></div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <small>Fiabilidad: <strong>{{ mechanic.reliability_skill }}/100</strong></small>
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar bg-info" style="width: {{ mechanic.reliability_skill }}%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {% if not active_training %}
+                        <form class="training-form">
+                            <input type="hidden" name="staff_type" value="mechanic">
+                            <input type="hidden" name="staff_id" value="{{ mechanic.id }}">
+                            
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <label class="form-label"><small><strong>Atributo a Mejorar:</strong></small></label>
+                                    <select name="attribute" class="form-select form-select-sm">
+                                        <option value="pit_stop_skill">Habilidad en Boxes</option>
+                                        <option value="reliability_skill">Fiabilidad</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label"><small><strong>Nivel:</strong></small></label>
+                                    <select name="level" class="form-select form-select-sm level-select">
+                                        <option value="1" data-cost="200000">Nivel 1 (+3)</option>
+                                        <option value="2" data-cost="400000">Nivel 2 (+6)</option>
+                                        <option value="3" data-cost="600000">Nivel 3 (+9)</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label"><small><strong>Duración:</strong></small></label>
+                                    <select name="weeks" class="form-select form-select-sm weeks-select">
+                                        <option value="1" data-cost="200000">1 semana</option>
+                                        <option value="2" data-cost="400000">2 semanas</option>
+                                        <option value="3" data-cost="600000">3 semanas</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-3 p-2 bg-light rounded">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <strong>Costo Total:</strong>
+                                    <span id="total_cost_mechanic_{{ mechanic.id }}" class="badge bg-success fs-6">
+                                        €400,000
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-success btn-sm w-100 mt-2">
+                                Iniciar Entrenamiento
+                            </button>
+                        </form>
+                        {% else %}
+                        <div class="text-center text-muted py-2">
+                            <small>Otro entrenamiento en progreso</small>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Pestaña de Ingenieros -->
+            <div class="tab-pane fade" id="engineers" role="tabpanel">
+                {% for engineer in team.engineers %}
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">{{ engineer.name }} ({{ engineer.age }} años)</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <small>Innovación: <strong>{{ engineer.innovation }}/100</strong></small>
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar bg-primary" style="width: {{ engineer.innovation }}%;"></div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <small>Velocidad Desarrollo: <strong>{{ engineer.development_speed }}/100</strong></small>
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar bg-info" style="width: {{ engineer.development_speed }}%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {% if not active_training %}
+                        <form class="training-form">
+                            <input type="hidden" name="staff_type" value="engineer">
+                            <input type="hidden" name="staff_id" value="{{ engineer.id }}">
+                            
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <label class="form-label"><small><strong>Atributo a Mejorar:</strong></small></label>
+                                    <select name="attribute" class="form-select form-select-sm">
+                                        <option value="innovation">Innovación</option>
+                                        <option value="development_speed">Velocidad Desarrollo</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label"><small><strong>Nivel:</strong></small></label>
+                                    <select name="level" class="form-select form-select-sm level-select">
+                                        <option value="1" data-cost="200000">Nivel 1 (+3)</option>
+                                        <option value="2" data-cost="400000">Nivel 2 (+6)</option>
+                                        <option value="3" data-cost="600000">Nivel 3 (+9)</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label"><small><strong>Duración:</strong></small></label>
+                                    <select name="weeks" class="form-select form-select-sm weeks-select">
+                                        <option value="1" data-cost="200000">1 semana</option>
+                                        <option value="2" data-cost="400000">2 semanas</option>
+                                        <option value="3" data-cost="600000">3 semanas</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-3 p-2 bg-light rounded">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <strong>Costo Total:</strong>
+                                    <span id="total_cost_engineer_{{ engineer.id }}" class="badge bg-success fs-6">
+                                        €400,000
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-success btn-sm w-100 mt-2">
+                                Iniciar Entrenamiento
+                            </button>
+                        </form>
+                        {% else %}
+                        <div class="text-center text-muted py-2">
+                            <small>Otro entrenamiento en progreso</small>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <!-- Entrenamiento en Progreso -->
+        {% if active_training %}
+        <div class="card border-warning mb-4">
+            <div class="card-header bg-warning text-dark">
+                <h5>🔄 Entrenamiento en Progreso</h5>
+            </div>
+            <div class="card-body">
+                <div class="training-item">
+                    {% set staff_name = "" %}
+                    {% if active_training.staff_type == 'driver' %}
+                        {% set staff = team.drivers|selectattr("id", "equalto", active_training.staff_id)|first %}
+                        {% set staff_name = staff.name if staff else "Piloto" %}
+                    {% elif active_training.staff_type == 'mechanic' %}
+                        {% set staff = team.mechanics|selectattr("id", "equalto", active_training.staff_id)|first %}
+                        {% set staff_name = staff.name if staff else "Mecánico" %}
+                    {% elif active_training.staff_type == 'engineer' %}
+                        {% set staff = team.engineers|selectattr("id", "equalto", active_training.staff_id)|first %}
+                        {% set staff_name = staff.name if staff else "Ingeniero" %}
+                    {% endif %}
+                    
+                    <strong>{{ staff_name }} - {{ active_training.attribute|title }}</strong><br>
+                    <small>Nivel {{ active_training.level }} - {{ active_training.weeks }} semana(s)</small><br>
+                    <small>Costo: €{{ "{:,.0f}".format(active_training.total_cost) }}</small><br>
+                    <small>Inició: {{ active_training.start_date.strftime('%d/%m/%Y') }}</small><br>
+                    <small>Finaliza: {{ active_training.end_date.strftime('%d/%m/%Y') }}</small>
+                    
+                    <!-- Barra de progreso -->
+                    <div class="progress mt-2" style="height: 20px;">
+                        {% set progress = active_training.progress %}
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                             style="width: {{ progress }}%">
+                            {{ progress|round|int }}%
+                        </div>
+                    </div>
+                    <small class="text-muted">Tiempo restante: {{ active_training.remaining_days }} día(s)</small>
+                    
+                    {% if active_training.progress >= 100 %}
+                    <form action="/complete_training/{{ active_training.id }}" method="POST" class="mt-2">
+                        <button type="submit" class="btn btn-success btn-sm w-100">
+                            ✅ Completar Entrenamiento
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Historial de Entrenamientos -->
+        <div class="card">
+            <div class="card-header">
+                <h5>📋 Historial de Entrenamientos</h5>
+            </div>
+            <div class="card-body">
+                {% if training_history %}
+                    {% for training in training_history %}
+                    <div class="training-item border-bottom pb-2 mb-2">
+                        <small>
+                            <strong>
+                                {% if training.staff_type == 'driver' %}🏎️
+                                {% elif training.staff_type == 'mechanic' %}🔧
+                                {% elif training.staff_type == 'engineer' %}📊
+                                {% endif %}
+                                {{ training.attribute|title }}
+                            </strong><br>
+                            Nivel {{ training.level }} - {{ training.weeks }} semana(s)<br>
+                            €{{ "{:,.0f}".format(training.total_cost) }} - 
+                            {{ training.start_date.strftime('%d/%m') }}
+                            {% if training.completed %}
+                            <span class="badge bg-success float-end">✓</span>
+                            {% else %}
+                            <span class="badge bg-warning float-end">⏳</span>
+                            {% endif %}
+                        </small>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <p class="text-muted text-center">No hay historial de entrenamientos</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Calcular y actualizar costos totales
+    function updateTotalCost(form) {
+        const levelSelect = form.querySelector('.level-select');
+        const weeksSelect = form.querySelector('.weeks-select');
+        
+        if (levelSelect && weeksSelect) {
+            const selectedLevel = levelSelect.options[levelSelect.selectedIndex];
+            const selectedWeeks = weeksSelect.options[weeksSelect.selectedIndex];
+            
+            const levelCost = parseInt(selectedLevel.dataset.cost);
+            const weeksCost = parseInt(selectedWeeks.dataset.cost);
+            const totalCost = levelCost + weeksCost;
+            
+            // Encontrar el elemento de costo total específico para este formulario
+            const staffId = form.querySelector('input[name="staff_id"]').value;
+            const staffType = form.querySelector('input[name="staff_type"]').value;
+            const totalElement = document.getElementById(`total_cost_${staffType}_${staffId}`);
+            
+            if (totalElement) {
+                totalElement.textContent = '€' + totalCost.toLocaleString();
+            }
+        }
+    }
+
+    // Agregar event listeners a todos los selects
+    document.querySelectorAll('.level-select, .weeks-select').forEach(select => {
+        select.addEventListener('change', function() {
+            const form = this.closest('form');
+            updateTotalCost(form);
+        });
+    });
+
+    // Inicializar costos al cargar la página
+    document.querySelectorAll('.training-form').forEach(form => {
+        updateTotalCost(form);
+    });
+
+    // Manejar envío de formularios
+    document.querySelectorAll('.training-form').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const staffType = formData.get('staff_type');
+            const staffId = formData.get('staff_id');
+            const attribute = formData.get('attribute');
+            const level = formData.get('level');
+            const weeks = formData.get('weeks');
+            
+            // Calcular costo total para confirmación
+            const levelCost = level * 200000;
+            const weeksCost = weeks * 200000;
+            const totalCost = levelCost + weeksCost;
+            
+            if (confirm(`¿Confirmar entrenamiento?\n\nPersonal: ${staffType}\nAtributo: ${attribute}\nNivel: ${level} (+${level * 3} puntos)\nDuración: ${weeks} semana(s)\n\nCosto total: €${totalCost.toLocaleString()}`)) {
+                fetch('/start_training', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Entrenamiento iniciado correctamente');
+                        location.reload();
+                    } else {
+                        alert(data.message || 'Error al iniciar el entrenamiento');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error al iniciar el entrenamiento');
+                });
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

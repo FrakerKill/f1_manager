@@ -1,0 +1,35 @@
+body {
+    background-color: #f8f9fa;
+}
+
+.navbar-brand {
+    font-weight: bold;
+    font-size: 1.5rem;
+}
+
+.driver-card, .component-card, .market-item {
+    background-color: white;
+    transition: transform 0.2s;
+}
+
+.driver-card:hover, .component-card:hover, .market-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.progress {
+    height: 25px;
+}
+
+.progress-bar {
+    font-weight: bold;
+}
+
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.alert {
+    margin-bottom: 10px;
+}

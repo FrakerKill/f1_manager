@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Calendario{% endblock %}
+
+{% block content %}
+<h1>Calendario de Carreras 2025</h1>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Ronda</th>
+                        <th>Gran Premio</th>
+                        <th>Circuito</th>
+                        <th>Vueltas</th>
+                        <th>Clasificación</th>
+                        <th>Carrera</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for race in races %}
+                    <tr>
+                        <td>{{ race.round_number }}</td>
+                        <td><strong>GP de {{ race.circuit.country }}</strong></td>
+                        <td>{{ race.circuit.name }}</td>
+                        <td>{{ race.circuit.laps }}</td>
+                        <td>
+                            <span data-race-time="{{ race.qualifying_session.isoformat() }}">
+                                {{ race.qualifying_session.strftime('%d/%m/%Y %H:%M') }}
+                            </span>
+                        </td>
+                        <td>
+                            <span data-race-time="{{ race.race_session.isoformat() }}">
+                                {{ race.race_session.strftime('%d/%m/%Y %H:%M') }}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('race_details', race_id=race.id) }}" class="btn btn-sm btn-outline-primary">
+                                Detalles
+                            </a>
+                            {% if race.race_session <= now %}
+                            <a href="{{ url_for('live_race', race_id=race.id) }}" class="btn btn-sm btn-success">
+                                Ver Carrera
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-4">
+    <div class="card-header">
+        <h5>Próxima Carrera</h5>
+    </div>
+    <div class="card-body">
+        {% if next_race %}
+        <div class="text-center">
+            <h4>GP de {{ next_race.circuit.country }}</h4>
+            <p class="lead">{{ next_race.circuit.name }}</p>
+            <p><strong>Vueltas:</strong> {{ next_race.circuit.laps }}</p>
+            <p><strong>Carrera:</strong> 
+                <span data-race-time="{{ next_race.race_session.isoformat() }}">
+                    {{ next_race.race_session.strftime('%d/%m/%Y a las %H:%M') }}
+                </span>
+            </p>
+            <a href="{{ url_for('race_details', race_id=next_race.id) }}" class="btn btn-primary">
+                Preparar para la Carrera
+            </a>
+        </div>
+        {% else %}
+        <p class="text-muted">No hay más carreras programadas esta temporada</p>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Actualizar horas locales
+    document.querySelectorAll('[data-race-time]').forEach(element => {
+        const utcTime = element.getAttribute('data-race-time');
+        const localTime = new Date(utcTime).toLocaleString('es-ES');
+        element.textContent = localTime;
+    });
+});
+</script>
+{% endblock %}

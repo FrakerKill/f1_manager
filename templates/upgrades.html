@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+
+{% block title %}Mejoras{% endblock %}
+
+{% block content %}
+<h1>Desarrollo de Mejoras</h1>
+
+<!-- Información del equipo -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-4">
+                        <h4 class="text-primary">€{{ "{:,.0f}".format(current_user.money) }}</h4>
+                        <small class="text-muted">Presupuesto Disponible</small>
+                    </div>
+                    <div class="col-md-4">
+                        <h4>
+                            {% set total_strength = team.car_components|sum(attribute='strength') %}
+                            {{ (total_strength / 4)|round|int }}
+                        </h4>
+                        <small class="text-muted">Fuerza Promedio</small>
+                    </div>
+                    <div class="col-md-4">
+                        <h4>
+                            {% set total_reliability = team.car_components|sum(attribute='reliability') %}
+                            {{ (total_reliability / 4)|round|int }}
+                        </h4>
+                        <small class="text-muted">Fiabilidad Promedio</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5>Componentes del Coche</h5>
+            </div>
+            <div class="card-body">
+                {% for component in team.car_components %}
+                <div class="component-upgrade border rounded p-3 mb-3">
+                    <h6>{{ component.component_type|title }}</h6>
+                    
+                    <!-- Estadísticas actuales -->
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <small>Fuerza: <strong>{{ component.strength }}/100</strong></small>
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar bg-success" style="width: {{ component.strength }}%;"></div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <small>Fiabilidad: <strong>{{ component.reliability }}/100</strong></small>
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar bg-warning" style="width: {{ component.reliability }}%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Formulario de mejora -->
+                    {% if not active_upgrade or active_upgrade.component_type == component.component_type %}
+                    <form class="upgrade-form">
+                        <input type="hidden" name="component_type" value="{{ component.component_type }}">
+                        
+                        <!-- Selección de nivel -->
+                        <div class="mb-3">
+                            <label class="form-label"><small><strong>Nivel de Mejora:</strong></small></label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="level" id="level_{{ component.component_type }}_1" value="1" checked data-cost="500000">
+                                <label class="btn btn-outline-primary btn-sm" for="level_{{ component.component_type }}_1">
+                                    Nv 1<br>€500,000
+                                </label>
+                                
+                                <input type="radio" class="btn-check" name="level" id="level_{{ component.component_type }}_2" value="2" data-cost="1000000">
+                                <label class="btn btn-outline-primary btn-sm" for="level_{{ component.component_type }}_2">
+                                    Nv 2<br>€1,000,000
+                                </label>
+                                
+                                <input type="radio" class="btn-check" name="level" id="level_{{ component.component_type }}_3" value="3" data-cost="1500000">
+                                <label class="btn btn-outline-primary btn-sm" for="level_{{ component.component_type }}_3">
+                                    Nv 3<br>€1,500,000
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Selección de semanas -->
+                        <div class="mb-3">
+                            <label class="form-label"><small><strong>Duración:</strong></small></label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="weeks" id="weeks_{{ component.component_type }}_1" value="1" checked data-cost="500000">
+                                <label class="btn btn-outline-secondary btn-sm" for="weeks_{{ component.component_type }}_1">
+                                    1 semana<br>€500,000
+                                </label>
+                                
+                                <input type="radio" class="btn-check" name="weeks" id="weeks_{{ component.component_type }}_2" value="2" data-cost="1000000">
+                                <label class="btn btn-outline-secondary btn-sm" for="weeks_{{ component.component_type }}_2">
+                                    2 semanas<br>€1,000,000
+                                </label>
+                                
+                                <input type="radio" class="btn-check" name="weeks" id="weeks_{{ component.component_type }}_3" value="3" data-cost="1500000">
+                                <label class="btn btn-outline-secondary btn-sm" for="weeks_{{ component.component_type }}_3">
+                                    3 semanas<br>€1,500,000
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Costo total -->
+                        <div class="mb-3 p-2 bg-light rounded">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <strong>Costo Total:</strong>
+                                <span id="total_cost_{{ component.component_type }}" class="badge bg-success fs-6">
+                                    €1,000,000
+                                </span>
+                            </div>
+                        </div>
+
+                        {% if not active_upgrade %}
+                        <button type="submit" class="btn btn-success btn-sm w-100">
+                            Iniciar Mejora
+                        </button>
+                        {% else %}
+                        <button type="button" class="btn btn-secondary btn-sm w-100" disabled>
+                            Mejora en Progreso
+                        </button>
+                        {% endif %}
+                    </form>
+                    {% else %}
+                    <div class="text-center text-muted py-2">
+                        <small>Otra mejora en progreso</small>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <!-- Mejora en Progreso -->
+        {% if active_upgrade %}
+        <div class="card border-warning mb-4">
+            <div class="card-header bg-warning text-dark">
+                <h5>🔄 Mejora en Progreso</h5>
+            </div>
+            <div class="card-body">
+                <div class="upgrade-item">
+                    <strong>{{ active_upgrade.component_type|title }} - Nivel {{ active_upgrade.level }}</strong><br>
+                    <small>Duración: {{ active_upgrade.weeks }} semana(s)</small><br>
+                    <small>Costo: €{{ "{:,.0f}".format(active_upgrade.total_cost) }}</small><br>
+                    <small>Inició: {{ active_upgrade.start_date.strftime('%d/%m/%Y') }}</small><br>
+                    <small>Finaliza: {{ active_upgrade.end_date.strftime('%d/%m/%Y') }}</small>
+                    
+                    <!-- Barra de progreso -->
+                    <div class="progress mt-2" style="height: 20px;">
+                        {% set progress = active_upgrade.progress %}
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                             style="width: {{ progress }}%">
+                            {{ progress|round|int }}%
+                        </div>
+                    </div>
+                    <small class="text-muted">Tiempo restante: {{ active_upgrade.remaining_days }} día(s)</small>
+                    
+                    {% if active_upgrade.progress >= 100 %}
+                    <form action="/complete_upgrade/{{ active_upgrade.id }}" method="POST" class="mt-2">
+                        <button type="submit" class="btn btn-success btn-sm w-100">
+                            ✅ Completar Mejora
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Historial de Mejoras -->
+        <div class="card">
+            <div class="card-header">
+                <h5>📋 Historial de Mejoras</h5>
+            </div>
+            <div class="card-body">
+                {% if upgrade_history %}
+                    {% for upgrade in upgrade_history %}
+                    <div class="upgrade-item border-bottom pb-2 mb-2">
+                        <small>
+                            <strong>{{ upgrade.component_type|title }}</strong><br>
+                            Nivel {{ upgrade.level }} - {{ upgrade.weeks }} semana(s)<br>
+                            €{{ "{:,.0f}".format(upgrade.total_cost) }} - 
+                            {{ upgrade.start_date.strftime('%d/%m') }}
+                            {% if upgrade.completed %}
+                            <span class="badge bg-success float-end">✓</span>
+                            {% else %}
+                            <span class="badge bg-warning float-end">⏳</span>
+                            {% endif %}
+                        </small>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <p class="text-muted text-center">No hay historial de mejoras</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Calcular y actualizar costos totales
+    function updateTotalCost(componentType) {
+        const form = document.querySelector(`input[value="${componentType}"]`).closest('form');
+        const levelInput = form.querySelector('input[name="level"]:checked');
+        const weeksInput = form.querySelector('input[name="weeks"]:checked');
+        
+        if (levelInput && weeksInput) {
+            const levelCost = parseInt(levelInput.dataset.cost);
+            const weeksCost = parseInt(weeksInput.dataset.cost);
+            const totalCost = levelCost + weeksCost;
+            
+            const totalElement = document.getElementById(`total_cost_${componentType}`);
+            if (totalElement) {
+                totalElement.textContent = '€' + totalCost.toLocaleString();
+            }
+        }
+    }
+
+    // Agregar event listeners a todos los radio buttons
+    document.querySelectorAll('input[type="radio"][name="level"], input[type="radio"][name="weeks"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            const form = this.closest('form');
+            const componentType = form.querySelector('input[name="component_type"]').value;
+            updateTotalCost(componentType);
+        });
+    });
+
+    // Inicializar costos al cargar la página
+    document.querySelectorAll('.upgrade-form').forEach(form => {
+        const componentType = form.querySelector('input[name="component_type"]').value;
+        updateTotalCost(componentType);
+    });
+
+    // Manejar envío de formularios
+    document.querySelectorAll('.upgrade-form').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const componentType = formData.get('component_type');
+            const level = formData.get('level');
+            const weeks = formData.get('weeks');
+            
+            // Calcular costo total para confirmación
+            const levelCost = level * 500000;
+            const weeksCost = weeks * 500000;
+            const totalCost = levelCost + weeksCost;
+            
+            if (confirm(`¿Confirmar mejora de ${componentType} - Nivel ${level} por ${weeks} semana(s)?\nCosto total: €${totalCost.toLocaleString()}`)) {
+                fetch('/start_upgrade', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Mejora iniciada correctamente');
+                        location.reload();
+                    } else {
+                        alert(data.message || 'Error al iniciar la mejora');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error al iniciar la mejora');
+                });
+            }
+        });
+    });
+});
+</script>
+{% endblock %}
