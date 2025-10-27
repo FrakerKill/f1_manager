@@ -36,9 +36,7 @@ fi
 echo "========================================"
 echo "   INICIANDO SERVIDOR WEB..."
 echo "========================================"
-echo "La aplicación estará disponible en:"
-echo "http://localhost:5000"
-echo ""
+echo "Buscando direcciones disponibles..."
 echo "Logs guardados en: $LOG_FILE"
 echo "Presiona Ctrl+C para detener el servidor"
 echo ""
@@ -48,9 +46,18 @@ echo "" >> "$LOG_FILE"
 echo "[$(date +%T)] ========================================" >> "$LOG_FILE"
 echo "[$(date +%T)]    INICIANDO SERVIDOR WEB..." >> "$LOG_FILE"
 echo "[$(date +%T)] ========================================" >> "$LOG_FILE"
-echo "[$(date +%T)] Aplicación disponible en: http://localhost:5000" >> "$LOG_FILE"
 
-# Función para manejar la señal de interrupción
+# Función para extraer y mostrar direcciones
+show_addresses() {
+    while IFS= read -r line; do
+        echo "$line" >> "$LOG_FILE"
+        if echo "$line" | grep -q "Running on"; then
+            echo "$line"
+        fi
+    done
+}
+
+# Configurar trap para Ctrl+C
 cleanup() {
     echo "" >> "$LOG_FILE"
     echo "[$(date +%T)] Servidor detenido por el usuario" >> "$LOG_FILE"
@@ -61,14 +68,13 @@ cleanup() {
     exit 0
 }
 
-# Configurar trap para Ctrl+C
 trap cleanup SIGINT
 
-# Ejecutar la aplicación y redirigir salida al log
+# Ejecutar y procesar salida
 echo "[$(date +%T)] Ejecutando: python3 run.py" >> "$LOG_FILE"
-python3 run.py >> "$LOG_FILE" 2>&1
+python3 run.py 2>&1 | show_addresses
 
-# Registrar cierre normal
+# Si llegamos aquí, el servidor se detuvo
 echo "" >> "$LOG_FILE"
 echo "[$(date +%T)] Servidor detenido normalmente" >> "$LOG_FILE"
 echo "[$(date +%T)] Desactivando entorno virtual..." >> "$LOG_FILE"
