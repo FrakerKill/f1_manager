@@ -660,6 +660,33 @@ def dashboard():
         completed=False
     ).first()
     
+    # Obtener posición en el campeonato del equipo
+    team_standings_result = db.session.query(
+        User.team_name,
+        db.func.sum(ChampionshipStandings.points).label('total_points'),
+        db.func.count(ChampionshipStandings.id).label('races_entered')
+    ).join(ChampionshipStandings, User.id == ChampionshipStandings.team_id
+    ).group_by(User.id, User.team_name
+    ).order_by(db.desc('total_points')).all()
+    
+    # Encontrar la posición del equipo actual
+    team_standings = None
+    leader_standings = None
+    
+    for i, standing in enumerate(team_standings_result):
+        if standing.team_name == current_user.team_name:
+            team_standings = {
+                'position': i + 1,
+                'total_points': standing.total_points or 0,
+                'races_entered': standing.races_entered or 0
+            }
+        
+        # Guardar también el líder para calcular diferencia
+        if i == 0:
+            leader_standings = {
+                'total_points': standing.total_points or 0
+            }
+    
     # Encontrar el próximo evento
     now = datetime.utcnow()
     next_event = None
@@ -687,7 +714,9 @@ def dashboard():
                          team=team_info, 
                          next_event=next_event,
                          active_upgrade=active_upgrade,
-                         active_training=active_training)
+                         active_training=active_training,
+                         team_standings=team_standings,
+                         leader_standings=leader_standings)
 
 @app.route('/team')
 @login_required

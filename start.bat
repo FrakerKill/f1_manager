@@ -53,8 +53,11 @@ echo.
 echo [%time%] Iniciando servidor Flask... >> "%LOG_FILE%"
 echo [%time%] Ejecutando: python run.py >> "%LOG_FILE%"
 
-:: Ejecutar Flask y capturar la salida específica de las direcciones
-python run.py 2>&1 | findstr "Running on" >> "%LOG_FILE%" & python run.py 1>> "%LOG_FILE%" 2>&1
+:: Ejecutar Flask y capturar TODA la salida
+echo [%time%] --- INICIO EJECUCION FLASK --- >> "%LOG_FILE%"
+python run.py >> "%LOG_FILE%" 2>&1
+set FLASK_EXIT_CODE=%errorlevel%
+echo [%time%] --- FIN EJECUCION FLASK (Codigo: !FLASK_EXIT_CODE!) --- >> "%LOG_FILE%"
 
 echo. >> "%LOG_FILE%"
 echo [%time%] Servidor detenido >> "%LOG_FILE%"

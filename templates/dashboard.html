@@ -6,10 +6,31 @@
 <div class="row">
     <div class="col-md-8">
         <h1>Dashboard - {{ current_user.team_name }}</h1>
+        
+        <!-- Tarjeta de información del equipo con posición en liga -->
         <div class="card mb-4">
             <div class="card-body">
-                <h5 class="card-title">Finanzas</h5>
-                <p class="card-text">Presupuesto: <strong>€{{ "{:,.0f}".format(current_user.money) }}</strong></p>
+                <div class="row text-center">
+                    <div class="col-md-3">
+                        <h4 class="text-primary">€{{ "{:,.0f}".format(current_user.money) }}</h4>
+                        <small class="text-muted">Presupuesto</small>
+                    </div>
+                    <div class="col-md-3">
+                        {% set team_position = team_standings.position if team_standings else 0 %}
+                        <h4 class="{% if team_position == 1 %}text-warning{% elif team_position <= 3 and team_position > 0 %}text-info{% else %}text-secondary{% endif %}">
+                            {% if team_position > 0 %}{{ team_position }}º{% else %}-{% endif %}
+                        </h4>
+                        <small class="text-muted">Posición Liga</small>
+                    </div>
+                    <div class="col-md-3">
+                        <h4 class="text-success">{{ team_standings.total_points if team_standings else 0 }}</h4>
+                        <small class="text-muted">Puntos</small>
+                    </div>
+                    <div class="col-md-3">
+                        <h4>{{ team.drivers|length }}/{{ config.MAX_DRIVERS }}</h4>
+                        <small class="text-muted">Pilotos</small>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -124,12 +145,86 @@
             </div>
         </div>
 
+        <!-- Posición en el Campeonato -->
+        <div class="card mt-3 border-primary">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">🏆 Posición en Liga</h5>
+            </div>
+            <div class="card-body text-center">
+                {% if team_standings and team_standings.position > 0 %}
+                <div class="position-display mb-3">
+                    <div class="position-number {% if team_standings.position == 1 %}first-place{% elif team_standings.position <= 3 %}podium-place{% else %}other-place{% endif %}">
+                        {{ team_standings.position }}º
+                    </div>
+                    <h4 class="text-success mb-1">{{ team_standings.total_points }} pts</h4>
+                    <small class="text-muted">{{ team_standings.races_entered }} carreras</small>
+                </div>
+                
+                {% if team_standings.position > 1 %}
+                {% set leader_points = leader_standings.total_points if leader_standings else team_standings.total_points %}
+                <div class="points-difference">
+                    <small class="text-muted">
+                        {% set difference = leader_points - team_standings.total_points %}
+                        -{{ difference }} pts del líder
+                    </small>
+                </div>
+                {% elif team_standings.position == 1 %}
+                <div class="points-difference">
+                    <small class="text-warning">
+                        <strong>¡LÍDER DEL CAMPEONATO!</strong>
+                    </small>
+                </div>
+                {% endif %}
+                
+                <a href="{{ url_for('championship') }}" class="btn btn-outline-primary btn-sm mt-2">
+                    Ver Clasificación Completa
+                </a>
+                {% else %}
+                <div class="text-center text-muted py-3">
+                    <i class="fas fa-flag-checkered fa-2x mb-2"></i>
+                    <p>Sin puntos en el campeonato</p>
+                    <a href="{{ url_for('championship') }}" class="btn btn-outline-primary btn-sm">
+                        Ver Clasificación
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
         <!-- Actividades en Progreso -->
         <div class="card mt-3 border-info">
             <div class="card-header bg-info text-white">
                 <h5 class="mb-0">🔄 Actividades en Progreso</h5>
             </div>
             <div class="card-body">
+                <!-- Mejoras en Progreso -->
+                {% if active_upgrade %}
+                <div class="activity-item mb-3 p-2 border rounded">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <h6 class="mb-1">🔧 Mejora de {{ active_upgrade.component_type|title }}</h6>
+                        <span class="badge bg-primary">Nv {{ active_upgrade.level }}</span>
+                    </div>
+                    <small class="text-muted">
+                        {{ active_upgrade.weeks }} semana(s) - €{{ "{:,.0f}".format(active_upgrade.total_cost) }}
+                    </small>
+                    <div class="progress mt-1" style="height: 15px;">
+                        {% set progress = active_upgrade.progress %}
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                             style="width: {{ progress }}%">
+                            {{ progress|round|int }}%
+                        </div>
+                    </div>
+                    <small class="text-muted d-block mt-1">
+                        Finaliza: {{ active_upgrade.end_date.strftime('%d/%m/%Y') }}
+                    </small>
+                    {% if active_upgrade.progress >= 100 %}
+                    <a href="{{ url_for('upgrades') }}" class="btn btn-success btn-sm w-100 mt-1">
+                        ✅ Completar Mejora
+                    </a>
+                    {% endif %}
+                </div>
+                {% endif %}
+
                 <!-- Entrenamientos en Progreso -->
                 {% if active_training %}
                 <div class="activity-item mb-3 p-2 border rounded">
@@ -172,34 +267,6 @@
                     {% if active_training.progress >= 100 %}
                     <a href="{{ url_for('training') }}" class="btn btn-success btn-sm w-100 mt-1">
                         ✅ Completar Entrenamiento
-                    </a>
-                    {% endif %}
-                </div>
-                {% endif %}
-
-                <!-- Mejoras en Progreso -->
-                {% if active_upgrade %}
-                <div class="activity-item mb-3 p-2 border rounded">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <h6 class="mb-1">🔧 Mejora de {{ active_upgrade.component_type|title }}</h6>
-                        <span class="badge bg-primary">Nv {{ active_upgrade.level }}</span>
-                    </div>
-                    <small class="text-muted">
-                        {{ active_upgrade.weeks }} semana(s) - €{{ "{:,.0f}".format(active_upgrade.total_cost) }}
-                    </small>
-                    <div class="progress mt-1" style="height: 15px;">
-                        {% set progress = active_upgrade.progress %}
-                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
-                             style="width: {{ progress }}%">
-                            {{ progress|round|int }}%
-                        </div>
-                    </div>
-                    <small class="text-muted d-block mt-1">
-                        Finaliza: {{ active_upgrade.end_date.strftime('%d/%m/%Y') }}
-                    </small>
-                    {% if active_upgrade.progress >= 100 %}
-                    <a href="{{ url_for('upgrades') }}" class="btn btn-success btn-sm w-100 mt-1">
-                        ✅ Completar Mejora
                     </a>
                     {% endif %}
                 </div>
@@ -318,6 +385,31 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .activity-item h6 {
     font-size: 0.9rem;
+}
+
+/* Estilos para la posición en liga */
+.position-display .position-number {
+    font-size: 3rem;
+    font-weight: bold;
+    line-height: 1;
+}
+
+.position-display .first-place {
+    color: #ffc107;
+    text-shadow: 2px 2px 4px rgba(255, 193, 7, 0.3);
+}
+
+.position-display .podium-place {
+    color: #17a2b8;
+    text-shadow: 2px 2px 4px rgba(23, 162, 184, 0.3);
+}
+
+.position-display .other-place {
+    color: #6c757d;
+}
+
+.points-difference {
+    margin-top: 0.5rem;
 }
 </style>
 {% endif %}
