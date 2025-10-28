@@ -1,3 +1,5 @@
+[file name]: dashboard.html
+[file content begin]
 {% extends "base.html" %}
 
 {% block title %}Dashboard{% endblock %}
@@ -121,16 +123,31 @@
                             Preparar Tests
                         </a>
                         {% elif next_event.session_type == 'qualifying' %}
-                        <a href="{{ url_for('race_strategy', race_id=next_event.race_id) }}" class="btn btn-sm btn-outline-success w-100 mb-1">
-                            Estrategia Clasificación
+                        <!-- ENLACE A ESTRATEGIA DE CLASIFICACIÓN -->
+                        <a href="{{ url_for('qualifying_session', race_id=next_event.race_id) }}" class="btn btn-sm btn-outline-success w-100 mb-1">
+                            🎯 Estrategia Clasificación
                         </a>
                         {% elif next_event.session_type == 'race' %}
+                        <!-- ENLACE A ESTRATEGIA DE CARRERA -->
                         <a href="{{ url_for('race_strategy', race_id=next_event.race_id) }}" class="btn btn-sm btn-outline-danger w-100 mb-1">
-                            Estrategia Carrera
+                            🏁 Estrategia Carrera
                         </a>
                         {% endif %}
-                        <a href="{{ url_for('race_details', race_id=next_event.race_id) }}" class="btn btn-sm btn-outline-secondary w-100">
-                            Ver Detalles
+                        
+                        <!-- Botones adicionales que siempre se muestran -->
+                        <div class="d-grid gap-1">
+                            <!-- ENLACE SIEMPRE DISPONIBLE A ESTRATEGIA DE CLASIFICACIÓN -->
+                            <a href="{{ url_for('qualifying_session', race_id=next_event.race_id) }}" class="btn btn-sm btn-outline-info">
+                                Planificar Clasificación
+                            </a>
+                            <!-- ENLACE SIEMPRE DISPONIBLE A ESTRATEGIA DE CARRERA -->
+                            <a href="{{ url_for('race_strategy', race_id=next_event.race_id) }}" class="btn btn-sm btn-outline-warning">
+                                Planificar Carrera
+                            </a>
+                        </div>
+                        
+                        <a href="{{ url_for('race_details', race_id=next_event.race_id) }}" class="btn btn-sm btn-outline-secondary w-100 mt-1">
+                            Ver Detalles del Evento
                         </a>
                     </div>
                 </div>
@@ -288,6 +305,7 @@
             </div>
         </div>
 
+        <!-- Acciones Rápidas -->
         <div class="card mt-3">
             <div class="card-body">
                 <h5 class="card-title">Acciones Rápidas</h5>
@@ -296,6 +314,23 @@
                     <a href="{{ url_for('upgrades') }}" class="btn btn-outline-success">Desarrollar Mejoras</a>
                     <a href="{{ url_for('training') }}" class="btn btn-outline-warning">Entrenar Personal</a>
                     <a href="{{ url_for('team_management') }}" class="btn btn-outline-info">Gestionar Equipo</a>
+                    
+                    <!-- NUEVOS BOTONES AÑADIDOS - ESTRATEGIAS -->
+                    {% if next_event %}
+                        <!-- ENLACE DIRECTO A ESTRATEGIA DE CLASIFICACIÓN -->
+                        <a href="{{ url_for('qualifying_session', race_id=next_event.race_id) }}" class="btn btn-outline-info">
+                            🎯 Estrategia Clasificación
+                        </a>
+                        <!-- ENLACE DIRECTO A ESTRATEGIA DE CARRERA -->
+                        <a href="{{ url_for('race_strategy', race_id=next_event.race_id) }}" class="btn btn-outline-danger">
+                            🏁 Estrategia Carrera
+                        </a>
+                    {% else %}
+                        <!-- Botones genéricos si no hay próximo evento -->
+                        <a href="{{ url_for('calendar') }}" class="btn btn-outline-secondary">
+                            Ver Calendario
+                        </a>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -342,6 +377,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setInterval(updateCountdown, 1000);
 });
 </script>
+{% endif %}
 
 <style>
 .countdown-container {
@@ -379,6 +415,15 @@ document.addEventListener('DOMContentLoaded', function() {
     padding: 4px 8px;
 }
 
+.event-actions .d-grid {
+    gap: 2px;
+}
+
+.event-actions .btn-sm {
+    font-size: 0.7rem;
+    padding: 3px 6px;
+}
+
 .activity-item {
     background: #f8f9fa;
 }
@@ -411,6 +456,12 @@ document.addEventListener('DOMContentLoaded', function() {
 .points-difference {
     margin-top: 0.5rem;
 }
+
+/* Estilos para las acciones rápidas */
+.d-grid .btn-sm {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
 </style>
-{% endif %}
 {% endblock %}
+[file content end]
