@@ -2,37 +2,192 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
     <title>F1 Manager - {% block title %}{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* Estilos generales para móvil */
+        body {
+            font-size: 16px; /* Tamaño base legible en móvil */
+            -webkit-text-size-adjust: 100%; /* Previene zoom de texto en iOS */
+        }
+        
+        /* Mejoras de navegación para móvil */
+        .navbar-nav .nav-link {
+            padding: 8px 12px;
+            font-size: 0.9rem;
+        }
+        
+        /* Botones más grandes para touch */
+        .btn {
+            padding: 10px 16px;
+            font-size: 0.95rem;
+            min-height: 44px; /* Altura mínima para touch */
+        }
+        
+        .btn-sm {
+            padding: 6px 12px;
+            min-height: 36px;
+        }
+        
+        /* Formularios optimizados para móvil */
+        .form-control, .form-select {
+            font-size: 16px; /* Previene zoom en iOS */
+            padding: 10px 12px;
+            min-height: 44px;
+        }
+        
+        /* Tablas responsive */
+        .table-responsive {
+            border: 1px solid #dee2e6;
+        }
+        
+        /* Cards con mejor espaciado */
+        .card {
+            margin-bottom: 1rem;
+        }
+        
+        .card-body {
+            padding: 1rem;
+        }
+        
+        /* Mejoras específicas para el dashboard */
+        .countdown-box {
+            padding: 10px 5px;
+        }
+        
+        .countdown-number {
+            font-size: 1.2rem;
+        }
+        
+        /* Mejoras para el mercado */
+        .market-item {
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+        }
+        
+        /* Ajustes para pantallas muy pequeñas */
+        @media (max-width: 576px) {
+            .container-fluid {
+                padding-left: 10px;
+                padding-right: 10px;
+            }
+            
+            h1 {
+                font-size: 1.75rem;
+            }
+            
+            h2 {
+                font-size: 1.5rem;
+            }
+            
+            h3 {
+                font-size: 1.25rem;
+            }
+            
+            .display-4 {
+                font-size: 2rem;
+            }
+            
+            /* Grid adjustments */
+            .row {
+                margin-left: -5px;
+                margin-right: -5px;
+            }
+            
+            .col, .col-1, .col-2, .col-3, .col-4, .col-5, .col-6, 
+            .col-7, .col-8, .col-9, .col-10, .col-11, .col-12 {
+                padding-left: 5px;
+                padding-right: 5px;
+            }
+            
+            /* Texto más pequeño en elementos secundarios */
+            .text-muted, small {
+                font-size: 0.85rem;
+            }
+            
+            /* Ajustes para elementos de progreso */
+            .progress {
+                height: 12px;
+            }
+            
+            /* Mejoras para botones en filas */
+            .btn-group-vertical .btn {
+                margin-bottom: 5px;
+            }
+        }
+        
+        /* Ajustes para tablets */
+        @media (max-width: 768px) {
+            .card-columns {
+                column-count: 1;
+            }
+        }
+        
+        /* Efectos táctiles SOLO para botones específicos */
+        .btn {
+            transition: all 0.2s ease;
+        }
+        
+        .btn:active {
+            transform: scale(0.98);
+        }
+    </style>
 </head>
 <body>
+    <!-- Navbar optimizada para móvil -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container">
+        <div class="container-fluid">
             <a class="navbar-brand" href="{{ url_for('index') }}">🏎️ F1 Manager</a>
-            
-            {% if current_user.is_authenticated %}
-            <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
-                <a class="nav-link" href="{{ url_for('team_management') }}">Mi Equipo</a>
-				<a class="nav-link" href="{{ url_for('finances') }}">Finanzas</a>
-                <a class="nav-link" href="{{ url_for('market') }}">Mercado</a>
-                <a class="nav-link" href="{{ url_for('upgrades') }}">Mejoras</a>
-				<a class="nav-link" href="{{ url_for('training') }}">Entrenamiento</a>
-                <a class="nav-link" href="{{ url_for('calendar') }}">Calendario</a>
-				<a class="nav-link" href="{{ url_for('championship') }}">Clasificación</a>
-                <a class="nav-link" href="{{ url_for('logout') }}">Cerrar Sesión</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" 
+                    aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                {% if current_user.is_authenticated %}
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('team_management') }}">Mi Equipo</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('finances') }}">Finanzas</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('market') }}">Mercado</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('upgrades') }}">Mejoras</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('training') }}">Entrenamiento</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('calendar') }}">Calendario</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('championship') }}">Clasificación</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('logout') }}">Cerrar Sesión</a>
+                    </li>
+                </ul>
+                {% endif %}
             </div>
-            {% endif %}
         </div>
     </nav>
 
-    <div class="container mt-4">
+    <div class="container-fluid mt-3">
         {% with messages = get_flashed_messages() %}
             {% if messages %}
                 {% for message in messages %}
-                    <div class="alert alert-info">{{ message }}</div>
+                    <div class="alert alert-info alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
@@ -41,6 +196,41 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        // SOLO mejoras esenciales - SIN INTERFERIR CON SCROLL
+        document.addEventListener('DOMContentLoaded', function() {
+            // Prevenir zoom en inputs (especialmente en iOS)
+            document.addEventListener('touchstart', function() {}, {passive: true});
+            
+            // Optimizar tablas para móvil (SOLO si no tienen ya table-responsive)
+            const tables = document.querySelectorAll('table');
+            tables.forEach(table => {
+                if (!table.closest('.table-responsive')) {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'table-responsive';
+                    table.parentNode.insertBefore(wrapper, table);
+                    wrapper.appendChild(table);
+                }
+            });
+            
+            // Ajustar automáticamente elementos problemáticos
+            function adjustForMobile() {
+                const width = window.innerWidth;
+                
+                if (width < 768) {
+                    // Ajustar columnas en elementos grid
+                    document.querySelectorAll('.row .col-md-4').forEach(col => {
+                        col.classList.add('mb-3');
+                    });
+                }
+            }
+            
+            // Ejecutar al cargar y al redimensionar
+            adjustForMobile();
+            window.addEventListener('resize', adjustForMobile);
+            
+            console.log('Base template cargada - Scroll debería funcionar correctamente');
+        });
+    </script>
 </body>
 </html>

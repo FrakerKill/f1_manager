@@ -1,336 +1,329 @@
-[file name]: dashboard.html
-[file content begin]
 {% extends "base.html" %}
 
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-8">
-        <h1>Dashboard - {{ current_user.team_name }}</h1>
-        
-        <!-- Tarjeta de información del equipo con posición en liga -->
-        <div class="card mb-4">
-            <div class="card-body">
-                <div class="row text-center">
-                    <div class="col-md-3">
-                        <h4 class="text-primary">€{{ "{:,.0f}".format(current_user.money) }}</h4>
-                        <small class="text-muted">Presupuesto</small>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12 col-lg-8 mb-3">
+            <h1 class="h3 mb-3">Dashboard - {{ current_user.team_name }}</h1>
+            
+            <!-- Tarjeta de información del equipo -->
+            <div class="card mb-3">
+                <div class="card-body py-2">
+                    <div class="row text-center">
+                        <div class="col-6 col-md-3 mb-2">
+                            <h5 class="text-primary mb-1">€{{ "{:,.0f}".format(current_user.money) }}</h5>
+                            <small class="text-muted">Presupuesto</small>
+                        </div>
+                        <div class="col-6 col-md-3 mb-2">
+                            {% set team_position = team_standings.position if team_standings else 0 %}
+                            <h5 class="{% if team_position == 1 %}text-warning{% elif team_position <= 3 and team_position > 0 %}text-info{% else %}text-secondary{% endif %} mb-1">
+                                {% if team_position > 0 %}{{ team_position }}º{% else %}-{% endif %}
+                            </h5>
+                            <small class="text-muted">Posición</small>
+                        </div>
+                        <div class="col-6 col-md-3 mb-2">
+                            <h5 class="text-success mb-1">{{ team_standings.total_points if team_standings else 0 }}</h5>
+                            <small class="text-muted">Puntos</small>
+                        </div>
+                        <div class="col-6 col-md-3 mb-2">
+                            <h5 class="mb-1">{{ team.drivers|length }}/{{ config.MAX_DRIVERS }}</h5>
+                            <small class="text-muted">Pilotos</small>
+                        </div>
                     </div>
-                    <div class="col-md-3">
-                        {% set team_position = team_standings.position if team_standings else 0 %}
-                        <h4 class="{% if team_position == 1 %}text-warning{% elif team_position <= 3 and team_position > 0 %}text-info{% else %}text-secondary{% endif %}">
-                            {% if team_position > 0 %}{{ team_position }}º{% else %}-{% endif %}
-                        </h4>
-                        <small class="text-muted">Posición Liga</small>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-12 col-md-6 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h6 class="card-title">Pilotos ({{ team.drivers|length }}/2)</h6>
+                            {% for driver in team.drivers %}
+                            <div class="driver-card mb-2 p-2 border rounded">
+                                <strong>{{ driver.name }}</strong><br>
+                                <small>Habilidad: {{ driver.skill }}</small><br>
+                                <small>Experiencia: {{ driver.experience }}</small>
+                            </div>
+                            {% endfor %}
+                        </div>
                     </div>
-                    <div class="col-md-3">
-                        <h4 class="text-success">{{ team_standings.total_points if team_standings else 0 }}</h4>
-                        <small class="text-muted">Puntos</small>
-                    </div>
-                    <div class="col-md-3">
-                        <h4>{{ team.drivers|length }}/{{ config.MAX_DRIVERS }}</h4>
-                        <small class="text-muted">Pilotos</small>
+                </div>
+
+                <div class="col-12 col-md-6 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h6 class="card-title">Coche</h6>
+                            {% for component in team.car_components %}
+                            <div class="component-card mb-2 p-2 border rounded">
+                                <strong>{{ component.component_type|title }}</strong><br>
+                                <small>Fuerza: {{ component.strength }}</small><br>
+                                <small>Fiabilidad: {{ component.reliability }}</small>
+                            </div>
+                            {% endfor %}
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="row">
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Pilotos ({{ team.drivers|length }}/2)</h5>
-                        {% for driver in team.drivers %}
-                        <div class="driver-card mb-2 p-2 border rounded">
-                            <strong>{{ driver.name }}</strong><br>
-                            Habilidad: {{ driver.skill }}<br>
-                            Experiencia: {{ driver.experience }}
-                        </div>
-                        {% endfor %}
-                    </div>
+        <div class="col-12 col-lg-4">
+            <!-- Próximo Evento -->
+            <div class="card border-warning mb-3">
+                <div class="card-header bg-warning text-dark py-2">
+                    <h6 class="mb-0">
+                        {% if next_event %}
+                            {% set session_time = next_event.session_datetime.replace(tzinfo=None) %}
+                            {% set current_time = now.replace(tzinfo=None) %}
+                            {% set seconds_to_session = (session_time - current_time).total_seconds() %}
+                            
+                            {% if seconds_to_session <= 600 and seconds_to_session > 0 %}
+                            🔴 EN VIVO PRONTO
+                            {% elif seconds_to_session <= 0 and seconds_to_session > -7200 %}
+                            🔴 EN DIRECTO
+                            {% else %}
+                            ⏰ Próximo Evento
+                            {% endif %}
+                        {% else %}
+                            ⏰ Próximo Evento
+                        {% endif %}
+                    </h6>
                 </div>
-            </div>
-
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Coche</h5>
-                        {% for component in team.car_components %}
-                        <div class="component-card mb-2 p-2 border rounded">
-                            <strong>{{ component.component_type|title }}</strong><br>
-                            Fuerza: {{ component.strength }}<br>
-                            Fiabilidad: {{ component.reliability }}
+                <div class="card-body">
+                    {% if next_event %}
+                    <div class="text-center">
+                        <h6 class="text-primary">{{ next_event.circuit.name }}</h6>
+                        <p class="mb-1 small">
+                            <span class="text-muted">
+                                {{ next_event.circuit.country }}<br>
+                                {{ next_event.session_type|title }}
+                            </span>
+                        </p>
+                        
+                        {% set session_time = next_event.session_datetime.replace(tzinfo=None) %}
+                        {% set current_time = now.replace(tzinfo=None) %}
+                        {% set seconds_to_session = (session_time - current_time).total_seconds() %}
+                        
+                        {% if seconds_to_session <= 600 and seconds_to_session > 0 %}
+                        <div class="alert alert-warning py-1 mb-2">
+                            <small>🔴 <strong>En vivo en {{ (seconds_to_session / 60)|round(0, 'floor')|int }} min</strong></small>
                         </div>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-4">
-        <!-- Próximo Evento con Cuenta Atrás -->
-        <div class="card border-warning">
-            <div class="card-header bg-warning text-dark">
-                <h5 class="mb-0">⏰ Próximo Evento</h5>
-            </div>
-            <div class="card-body">
-                {% if next_event %}
-                <div class="text-center">
-                    <h6 class="text-primary">{{ next_event.circuit.name }}</h6>
-                    <p class="mb-1">
-                        <small class="text-muted">
-                            {{ next_event.circuit.country }}<br>
-                            {{ next_event.session_type|title }} - 
-                            {{ next_event.session_datetime.strftime('%d/%m/%Y %H:%M') }}
-                        </small>
-                    </p>
-                    
-                    <!-- Cuenta atrás -->
-                    <div id="countdown-timer" class="countdown-container mb-3">
-                        <div class="row text-center">
-                            <div class="col-3">
-                                <div class="countdown-box">
-                                    <span id="countdown-days" class="countdown-number">00</span>
-                                    <small class="countdown-label">Días</small>
-                                </div>
-                            </div>
-                            <div class="col-3">
-                                <div class="countdown-box">
-                                    <span id="countdown-hours" class="countdown-number">00</span>
-                                    <small class="countdown-label">Horas</small>
-                                </div>
-                            </div>
-                            <div class="col-3">
-                                <div class="countdown-box">
-                                    <span id="countdown-minutes" class="countdown-number">00</span>
-                                    <small class="countdown-label">Minutos</small>
-                                </div>
-                            </div>
-                            <div class="col-3">
-                                <div class="countdown-box">
-                                    <span id="countdown-seconds" class="countdown-number">00</span>
-                                    <small class="countdown-label">Segundos</small>
-                                </div>
-                            </div>
+                        {% elif seconds_to_session <= 0 and seconds_to_session > -7200 %}
+                        <div class="alert alert-danger py-1 mb-2">
+                            <small>🔴 <strong>¡EN VIVO AHORA!</strong></small>
                         </div>
-                    </div>
-                    
-                    <div class="event-actions">
-                        {% if next_event.session_type == 'test' %}
-                        <a href="{{ url_for('test_session', race_id=next_event.race_id) }}" class="btn btn-sm btn-outline-primary w-100 mb-1">
-                            Preparar Tests
-                        </a>
-                        {% elif next_event.session_type == 'qualifying' %}
-                        <!-- ENLACE A ESTRATEGIA DE CLASIFICACIÓN -->
-                        <a href="{{ url_for('qualifying_session', race_id=next_event.race_id) }}" class="btn btn-sm btn-outline-success w-100 mb-1">
-                            🎯 Estrategia Clasificación
-                        </a>
-                        {% elif next_event.session_type == 'race' %}
-                        <!-- ENLACE A ESTRATEGIA DE CARRERA -->
-                        <a href="{{ url_for('race_strategy', race_id=next_event.race_id) }}" class="btn btn-sm btn-outline-danger w-100 mb-1">
-                            🏁 Estrategia Carrera
-                        </a>
+                        {% elif seconds_to_session <= -7200 %}
+                        <div class="alert alert-secondary py-1 mb-2">
+                            <small>📼 <strong>Diferido</strong></small>
+                        </div>
                         {% endif %}
                         
-                        <!-- Botones adicionales que siempre se muestran -->
-                        <div class="d-grid gap-1">
-                            <!-- ENLACE SIEMPRE DISPONIBLE A ESTRATEGIA DE CLASIFICACIÓN -->
-                            <a href="{{ url_for('qualifying_session', race_id=next_event.race_id) }}" class="btn btn-sm btn-outline-info">
-                                Planificar Clasificación
-                            </a>
-                            <!-- ENLACE SIEMPRE DISPONIBLE A ESTRATEGIA DE CARRERA -->
-                            <a href="{{ url_for('race_strategy', race_id=next_event.race_id) }}" class="btn btn-sm btn-outline-warning">
-                                Planificar Carrera
-                            </a>
+                        <!-- Cuenta atrás -->
+                        {% if seconds_to_session > 0 %}
+                        <div id="countdown-timer" class="countdown-container mb-3">
+                            <div class="row text-center">
+                                <div class="col-3">
+                                    <div class="countdown-box">
+                                        <span id="countdown-days" class="countdown-number">00</span>
+                                        <small class="countdown-label">Días</small>
+                                    </div>
+                                </div>
+                                <div class="col-3">
+                                    <div class="countdown-box">
+                                        <span id="countdown-hours" class="countdown-number">00</span>
+                                        <small class="countdown-label">Horas</small>
+                                    </div>
+                                </div>
+                                <div class="col-3">
+                                    <div class="countdown-box">
+                                        <span id="countdown-minutes" class="countdown-number">00</span>
+                                        <small class="countdown-label">Min</small>
+                                    </div>
+                                </div>
+                                <div class="col-3">
+                                    <div class="countdown-box">
+                                        <span id="countdown-seconds" class="countdown-number">00</span>
+                                        <small class="countdown-label">Seg</small>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
+                        {% endif %}
                         
-                        <a href="{{ url_for('race_details', race_id=next_event.race_id) }}" class="btn btn-sm btn-outline-secondary w-100 mt-1">
-                            Ver Detalles del Evento
-                        </a>
-                    </div>
-                </div>
-                {% else %}
-                <div class="text-center text-muted">
-                    <p>No hay eventos próximos</p>
-                    <a href="{{ url_for('calendar') }}" class="btn btn-sm btn-outline-primary">
-                        Ver Calendario Completo
-                    </a>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Posición en el Campeonato -->
-        <div class="card mt-3 border-primary">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">🏆 Posición en Liga</h5>
-            </div>
-            <div class="card-body text-center">
-                {% if team_standings and team_standings.position > 0 %}
-                <div class="position-display mb-3">
-                    <div class="position-number {% if team_standings.position == 1 %}first-place{% elif team_standings.position <= 3 %}podium-place{% else %}other-place{% endif %}">
-                        {{ team_standings.position }}º
-                    </div>
-                    <h4 class="text-success mb-1">{{ team_standings.total_points }} pts</h4>
-                    <small class="text-muted">{{ team_standings.races_entered }} carreras</small>
-                </div>
-                
-                {% if team_standings.position > 1 %}
-                {% set leader_points = leader_standings.total_points if leader_standings else team_standings.total_points %}
-                <div class="points-difference">
-                    <small class="text-muted">
-                        {% set difference = leader_points - team_standings.total_points %}
-                        -{{ difference }} pts del líder
-                    </small>
-                </div>
-                {% elif team_standings.position == 1 %}
-                <div class="points-difference">
-                    <small class="text-warning">
-                        <strong>¡LÍDER DEL CAMPEONATO!</strong>
-                    </small>
-                </div>
-                {% endif %}
-                
-                <a href="{{ url_for('championship') }}" class="btn btn-outline-primary btn-sm mt-2">
-                    Ver Clasificación Completa
-                </a>
-                {% else %}
-                <div class="text-center text-muted py-3">
-                    <i class="fas fa-flag-checkered fa-2x mb-2"></i>
-                    <p>Sin puntos en el campeonato</p>
-                    <a href="{{ url_for('championship') }}" class="btn btn-outline-primary btn-sm">
-                        Ver Clasificación
-                    </a>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Actividades en Progreso -->
-        <div class="card mt-3 border-info">
-            <div class="card-header bg-info text-white">
-                <h5 class="mb-0">🔄 Actividades en Progreso</h5>
-            </div>
-            <div class="card-body">
-                <!-- Mejoras en Progreso -->
-                {% if active_upgrade %}
-                <div class="activity-item mb-3 p-2 border rounded">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <h6 class="mb-1">🔧 Mejora de {{ active_upgrade.component_type|title }}</h6>
-                        <span class="badge bg-primary">Nv {{ active_upgrade.level }}</span>
-                    </div>
-                    <small class="text-muted">
-                        {{ active_upgrade.weeks }} semana(s) - €{{ "{:,.0f}".format(active_upgrade.total_cost) }}
-                    </small>
-                    <div class="progress mt-1" style="height: 15px;">
-                        {% set progress = active_upgrade.progress %}
-                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
-                             style="width: {{ progress }}%">
-                            {{ progress|round|int }}%
-                        </div>
-                    </div>
-                    <small class="text-muted d-block mt-1">
-                        Finaliza: {{ active_upgrade.end_date.strftime('%d/%m/%Y') }}
-                    </small>
-                    {% if active_upgrade.progress >= 100 %}
-                    <a href="{{ url_for('upgrades') }}" class="btn btn-success btn-sm w-100 mt-1">
-                        ✅ Completar Mejora
-                    </a>
-                    {% endif %}
-                </div>
-                {% endif %}
-
-                <!-- Entrenamientos en Progreso -->
-                {% if active_training %}
-                <div class="activity-item mb-3 p-2 border rounded">
-                    {% set staff_name = "" %}
-                    {% if active_training.staff_type == 'driver' %}
-                        {% set staff = team.drivers|selectattr("id", "equalto", active_training.staff_id)|first %}
-                        {% set staff_name = staff.name if staff else "Piloto" %}
-                    {% elif active_training.staff_type == 'mechanic' %}
-                        {% set staff = team.mechanics|selectattr("id", "equalto", active_training.staff_id)|first %}
-                        {% set staff_name = staff.name if staff else "Mecánico" %}
-                    {% elif active_training.staff_type == 'engineer' %}
-                        {% set staff = team.engineers|selectattr("id", "equalto", active_training.staff_id)|first %}
-                        {% set staff_name = staff.name if staff else "Ingeniero" %}
-                    {% endif %}
-                    
-                    <div class="d-flex justify-content-between align-items-start">
-                        <h6 class="mb-1">
-                            {% if active_training.staff_type == 'driver' %}🏎️
-                            {% elif active_training.staff_type == 'mechanic' %}🔧
-                            {% elif active_training.staff_type == 'engineer' %}📊
+                        <div class="event-actions">
+                            {% if seconds_to_session <= 600 and seconds_to_session > -7200 %}
+                            <a href="{{ url_for('live_session', race_id=next_event.race_id, session_type=next_event.session_type) }}" 
+                               class="btn btn-danger btn-sm w-100 mb-2 live-button">
+                               {% if seconds_to_session > 0 %}
+                               🔴 VER EN VIVO
+                               {% else %}
+                               🔴 VER DIRECTO
+                               {% endif %}
+                            </a>
+                            {% elif seconds_to_session <= -7200 %}
+                            <a href="{{ url_for('live_session', race_id=next_event.race_id, session_type=next_event.session_type) }}" 
+                               class="btn btn-outline-secondary btn-sm w-100 mb-2">
+                               📼 VER DIFERIDO
+                            </a>
                             {% endif %}
-                            {{ staff_name }}
-                        </h6>
-                        <span class="badge bg-primary">Nv {{ active_training.level }}</span>
-                    </div>
-                    <small class="text-muted">
-                        {{ active_training.attribute|title }} - {{ active_training.weeks }} semana(s)<br>
-                        €{{ "{:,.0f}".format(active_training.total_cost) }}
-                    </small>
-                    <div class="progress mt-1" style="height: 15px;">
-                        {% set progress = active_training.progress %}
-                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-warning" 
-                             style="width: {{ progress }}%">
-                            {{ progress|round|int }}%
+                            
+                            <!-- BOTÓN PRINCIPAL SEGÚN TIPO DE SESIÓN -->
+                            {% if next_event.session_type == 'test' %}
+                            <a href="{{ url_for('test_session', race_id=next_event.race_id) }}" class="btn btn-warning btn-sm w-100 mb-2">
+                                🧪 Realizar Tests
+                            </a>
+                            {% elif next_event.session_type == 'qualifying' %}
+                            <a href="{{ url_for('qualifying_session', race_id=next_event.race_id) }}" class="btn btn-info btn-sm w-100 mb-2">
+                                🎯 Estrategia Clasificación
+                            </a>
+                            {% elif next_event.session_type == 'race' %}
+                            <a href="{{ url_for('race_strategy', race_id=next_event.race_id) }}" class="btn btn-danger btn-sm w-100 mb-2">
+                                🏁 Estrategia Carrera
+                            </a>
+                            {% endif %}
+                            
+                            <!-- BOTONES SECUNDARIOS -->
+                            <div class="d-grid gap-1">
+                                <a href="{{ url_for('test_session', race_id=next_event.race_id) }}" class="btn btn-sm btn-outline-success">
+                                    Tests
+                                </a>
+                                <a href="{{ url_for('qualifying_session', race_id=next_event.race_id) }}" class="btn btn-sm btn-outline-info">
+                                    Clasificación
+                                </a>
+                                <a href="{{ url_for('race_strategy', race_id=next_event.race_id) }}" class="btn btn-sm btn-outline-warning">
+                                    Carrera
+                                </a>
+                            </div>
+                            
+                            <a href="{{ url_for('race_details', race_id=next_event.race_id) }}" class="btn btn-sm btn-outline-secondary w-100 mt-1">
+                                Ver Detalles del Evento
+                            </a>
                         </div>
                     </div>
-                    <small class="text-muted d-block mt-1">
-                        Finaliza: {{ active_training.end_date.strftime('%d/%m/%Y') }}
-                    </small>
-                    {% if active_training.progress >= 100 %}
-                    <a href="{{ url_for('training') }}" class="btn btn-success btn-sm w-100 mt-1">
-                        ✅ Completar Entrenamiento
-                    </a>
-                    {% endif %}
-                </div>
-                {% endif %}
-
-                {% if not active_upgrade and not active_training %}
-                <div class="text-center text-muted py-3">
-                    <p>No hay actividades en progreso</p>
-                    <div class="d-grid gap-2">
-                        <a href="{{ url_for('upgrades') }}" class="btn btn-outline-primary btn-sm">
-                            Desarrollar Mejoras
-                        </a>
-                        <a href="{{ url_for('training') }}" class="btn btn-outline-warning btn-sm">
-                            Entrenar Personal
-                        </a>
-                    </div>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Acciones Rápidas -->
-        <div class="card mt-3">
-            <div class="card-body">
-                <h5 class="card-title">Acciones Rápidas</h5>
-                <div class="d-grid gap-2">
-                    <a href="{{ url_for('market') }}" class="btn btn-outline-primary">Mercado de Transferencias</a>
-                    <a href="{{ url_for('upgrades') }}" class="btn btn-outline-success">Desarrollar Mejoras</a>
-                    <a href="{{ url_for('training') }}" class="btn btn-outline-warning">Entrenar Personal</a>
-                    <a href="{{ url_for('team_management') }}" class="btn btn-outline-info">Gestionar Equipo</a>
-                    
-                    <!-- NUEVOS BOTONES AÑADIDOS - ESTRATEGIAS -->
-                    {% if next_event %}
-                        <!-- ENLACE DIRECTO A ESTRATEGIA DE CLASIFICACIÓN -->
-                        <a href="{{ url_for('qualifying_session', race_id=next_event.race_id) }}" class="btn btn-outline-info">
-                            🎯 Estrategia Clasificación
-                        </a>
-                        <!-- ENLACE DIRECTO A ESTRATEGIA DE CARRERA -->
-                        <a href="{{ url_for('race_strategy', race_id=next_event.race_id) }}" class="btn btn-outline-danger">
-                            🏁 Estrategia Carrera
-                        </a>
                     {% else %}
-                        <!-- Botones genéricos si no hay próximo evento -->
-                        <a href="{{ url_for('calendar') }}" class="btn btn-outline-secondary">
+                    <div class="text-center text-muted">
+                        <p class="small">No hay eventos próximos</p>
+                        <a href="{{ url_for('calendar') }}" class="btn btn-sm btn-outline-primary">
                             Ver Calendario
                         </a>
+                    </div>
                     {% endif %}
+                </div>
+            </div>
+
+            <!-- Actividades en Progreso -->
+            <div class="card border-info mb-3">
+                <div class="card-header bg-info text-white py-2">
+                    <h6 class="mb-0">🔄 Actividades</h6>
+                </div>
+                <div class="card-body">
+                    {% if active_upgrade %}
+                    <div class="activity-item mb-3 p-2 border rounded">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <h6 class="mb-1">🔧 {{ active_upgrade.component_type|title }}</h6>
+                            <span class="badge bg-primary">Nv {{ active_upgrade.level }}</span>
+                        </div>
+                        <small class="text-muted">
+                            {{ active_upgrade.weeks }} semana(s)
+                        </small>
+                        <div class="progress mt-1" style="height: 12px;">
+                            {% set progress = active_upgrade.progress %}
+                            <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                                 style="width: {{ progress }}%">
+                                {{ progress|round|int }}%
+                            </div>
+                        </div>
+                        {% if active_upgrade.progress >= 100 %}
+                        <a href="{{ url_for('upgrades') }}" class="btn btn-success btn-sm w-100 mt-1">
+                            ✅ Completar
+                        </a>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    {% if active_training %}
+                    <div class="activity-item mb-3 p-2 border rounded">
+                        {% set staff_name = "" %}
+                        {% if active_training.staff_type == 'driver' %}
+                            {% set staff = team.drivers|selectattr("id", "equalto", active_training.staff_id)|first %}
+                            {% set staff_name = staff.name if staff else "Piloto" %}
+                        {% elif active_training.staff_type == 'mechanic' %}
+                            {% set staff = team.mechanics|selectattr("id", "equalto", active_training.staff_id)|first %}
+                            {% set staff_name = staff.name if staff else "Mecánico" %}
+                        {% elif active_training.staff_type == 'engineer' %}
+                            {% set staff = team.engineers|selectattr("id", "equalto", active_training.staff_id)|first %}
+                            {% set staff_name = staff.name if staff else "Ingeniero" %}
+                        {% endif %}
+                        
+                        <div class="d-flex justify-content-between align-items-start">
+                            <h6 class="mb-1">
+                                {% if active_training.staff_type == 'driver' %}🏎️
+                                {% elif active_training.staff_type == 'mechanic' %}🔧
+                                {% elif active_training.staff_type == 'engineer' %}📊
+                                {% endif %}
+                                {{ staff_name }}
+                            </h6>
+                            <span class="badge bg-primary">Nv {{ active_training.level }}</span>
+                        </div>
+                        <small class="text-muted">
+                            {{ active_training.attribute|title }}
+                        </small>
+                        <div class="progress mt-1" style="height: 12px;">
+                            {% set progress = active_training.progress %}
+                            <div class="progress-bar progress-bar-striped progress-bar-animated bg-warning" 
+                                 style="width: {{ progress }}%">
+                                {{ progress|round|int }}%
+                            </div>
+                        </div>
+                        {% if active_training.progress >= 100 %}
+                        <a href="{{ url_for('training') }}" class="btn btn-success btn-sm w-100 mt-1">
+                            ✅ Completar
+                        </a>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    {% if not active_upgrade and not active_training %}
+                    <div class="text-center text-muted py-2">
+                        <p class="small">No hay actividades</p>
+                        <div class="d-grid gap-2">
+                            <a href="{{ url_for('upgrades') }}" class="btn btn-outline-primary btn-sm">
+                                Mejoras
+                            </a>
+                            <a href="{{ url_for('training') }}" class="btn btn-outline-warning btn-sm">
+                                Entrenar
+                            </a>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Estadísticas Rápidas -->
+            <div class="card border-success">
+                <div class="card-header bg-success text-white py-2">
+                    <h6 class="mb-0">📊 Estadísticas</h6>
+                </div>
+                <div class="card-body text-center py-2">
+                    <div class="row">
+                        <div class="col-6 mb-2">
+                            <h6 class="text-primary">{{ team.drivers|length }}/{{ config.MAX_DRIVERS }}</h6>
+                            <small class="text-muted">Pilotos</small>
+                        </div>
+                        <div class="col-6 mb-2">
+                            <h6 class="text-success">{{ team.mechanics|length }}/{{ config.MAX_MECHANICS }}</h6>
+                            <small class="text-muted">Mecánicos</small>
+                        </div>
+                        <div class="col-6">
+                            <h6 class="text-info">{{ team.engineers|length }}/{{ config.MAX_ENGINEERS }}</h6>
+                            <small class="text-muted">Ingenieros</small>
+                        </div>
+                        <div class="col-6">
+                            <h6 class="text-warning">{{ team.car_components|length }}/4</h6>
+                            <small class="text-muted">Componentes</small>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -348,31 +341,27 @@ document.addEventListener('DOMContentLoaded', function() {
         const distance = eventDate - now;
         
         if (distance < 0) {
-            // El evento ya pasó
-            document.getElementById('countdown-days').textContent = '00';
-            document.getElementById('countdown-hours').textContent = '00';
-            document.getElementById('countdown-minutes').textContent = '00';
-            document.getElementById('countdown-seconds').textContent = '00';
-            
-            // Actualizar la interfaz para mostrar que el evento está en curso
-            document.querySelector('.card-header h5').innerHTML = '🎯 Evento en Curso';
+            window.location.reload();
             return;
         }
         
-        // Calcular días, horas, minutos y segundos
         const days = Math.floor(distance / (1000 * 60 * 60 * 24));
         const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
         const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
         const seconds = Math.floor((distance % (1000 * 60)) / 1000);
         
-        // Actualizar display
         document.getElementById('countdown-days').textContent = days.toString().padStart(2, '0');
         document.getElementById('countdown-hours').textContent = hours.toString().padStart(2, '0');
         document.getElementById('countdown-minutes').textContent = minutes.toString().padStart(2, '0');
         document.getElementById('countdown-seconds').textContent = seconds.toString().padStart(2, '0');
+        
+        if (distance <= 10 * 60 * 1000) {
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        }
     }
     
-    // Actualizar cada segundo
     updateCountdown();
     setInterval(updateCountdown, 1000);
 });
@@ -382,21 +371,21 @@ document.addEventListener('DOMContentLoaded', function() {
 <style>
 .countdown-container {
     background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-    border-radius: 10px;
-    padding: 15px;
-    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    padding: 10px;
+    border: 1px solid #dee2e6;
 }
 
 .countdown-box {
     background: white;
-    border-radius: 8px;
-    padding: 8px 5px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border-radius: 6px;
+    padding: 5px 3px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     border: 1px solid #dee2e6;
 }
 
 .countdown-number {
-    font-size: 1.4rem;
+    font-size: 1rem;
     font-weight: bold;
     color: #dc3545;
     display: block;
@@ -404,24 +393,21 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 .countdown-label {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     color: #6c757d;
     text-transform: uppercase;
     font-weight: 600;
 }
 
-.event-actions .btn {
-    font-size: 0.8rem;
-    padding: 4px 8px;
+.live-button {
+    animation: pulse 2s infinite;
+    font-weight: bold;
 }
 
-.event-actions .d-grid {
-    gap: 2px;
-}
-
-.event-actions .btn-sm {
-    font-size: 0.7rem;
-    padding: 3px 6px;
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
 }
 
 .activity-item {
@@ -432,36 +418,8 @@ document.addEventListener('DOMContentLoaded', function() {
     font-size: 0.9rem;
 }
 
-/* Estilos para la posición en liga */
-.position-display .position-number {
-    font-size: 3rem;
-    font-weight: bold;
-    line-height: 1;
-}
-
-.position-display .first-place {
-    color: #ffc107;
-    text-shadow: 2px 2px 4px rgba(255, 193, 7, 0.3);
-}
-
-.position-display .podium-place {
-    color: #17a2b8;
-    text-shadow: 2px 2px 4px rgba(23, 162, 184, 0.3);
-}
-
-.position-display .other-place {
-    color: #6c757d;
-}
-
-.points-difference {
-    margin-top: 0.5rem;
-}
-
-/* Estilos para las acciones rápidas */
-.d-grid .btn-sm {
-    font-size: 0.75rem;
-    padding: 0.25rem 0.5rem;
+.event-actions .btn {
+    margin-bottom: 5px;
 }
 </style>
 {% endblock %}
-[file content end]

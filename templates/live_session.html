@@ -1,0 +1,1009 @@
+{% extends "base.html" %}
+
+{% block title %}Transmisión {{ session_type|title }} - {{ race.circuit.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Cabecera de la transmisión -->
+    <div class="card bg-dark text-white mb-4">
+        <div class="card-body text-center">
+            <h1>
+                {% if session_type == 'qualifying' %}🏁 CLASIFICACIÓN{% else %}🏎️ CARRERA{% endif %}
+                EN {% if session_status == 'live' %}DIRECTO{% elif session_status == 'replay' %}DIFERIDO{% else %}PRÓXIMAMENTE{% endif %}
+            </h1>
+            <h3>Gran Premio de {{ race.circuit.country }}</h3>
+            <h4>{{ race.circuit.name }}</h4>
+            
+            <!-- Estado de la transmisión -->
+            <div class="mt-3">
+                {% if session_status == 'live' %}
+                <span class="badge bg-danger fs-6 p-2">🔴 EN DIRECTO</span>
+                {% elif session_status == 'replay' %}
+                <span class="badge bg-secondary fs-6 p-2">📼 DIFERIDO</span>
+                {% else %}
+                <span class="badge bg-warning fs-6 p-2">⏰ PRÓXIMAMENTE</span>
+                {% endif %}
+            </div>
+
+            <!-- Información específica de la sesión -->
+            <div class="row mt-3">
+                <div class="col-md-6">
+                    <p class="mb-1">
+                        <strong>{% if session_type == 'qualifying' %}Formato:{% else %}Vueltas:{% endif %}</strong>
+                        {% if session_type == 'qualifying' %}
+                        Q1, Q2, Q3
+                        {% else %}
+                        {{ race.circuit.laps }}
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="col-md-6">
+                    <p class="mb-1">
+                        <strong>Hora:</strong>
+                        <span data-session-time="{{ session_time.isoformat() if session_time else '' }}">
+                            {% if session_time %}
+                                {{ session_time.strftime('%d/%m/%Y %H:%M') }}
+                            {% else %}
+                                Por definir
+                            {% endif %}
+                        </span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Botón de simulación (solo para admin/desarrollo) -->
+            {% if session_type == 'qualifying' and session_status != 'live' %}
+            <div class="mt-3">
+                <button class="btn btn-success btn-lg" onclick="simulateQualifying()" id="simulate-btn">
+                    <i class="fas fa-play"></i> Simular Clasificación en Vivo
+                </button>
+                <small class="d-block mt-1 text-muted">La simulación se ejecutará en segundo plano</small>
+            </div>
+            {% elif session_type == 'race' and session_status != 'live' %}
+            <div class="mt-3">
+                <button class="btn btn-success btn-lg" onclick="simulateRace()" id="simulate-btn">
+                    <i class="fas fa-play"></i> Simular Carrera en Vivo
+                </button>
+                <small class="d-block mt-1 text-muted">La simulación se ejecutará en segundo plano</small>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Columna principal -->
+        <div class="col-lg-8">
+            <!-- Eventos en vivo -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">📡 EVENTOS EN DIRECTO</h5>
+                    <div class="d-flex align-items-center">
+                        <span class="badge bg-info me-2" id="events-count">0</span>
+                        <button class="btn btn-sm btn-outline-primary" onclick="refreshEvents()" title="Actualizar eventos">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div style="max-height: 400px; overflow-y: auto;" id="live-events">
+                        <div id="events-loading" class="text-center p-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Cargando eventos...</span>
+                            </div>
+                            <p class="mt-2 text-muted">Cargando eventos en vivo...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar informativa -->
+        <div class="col-lg-4">
+            <!-- Información de la sesión -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">📋 INFORMACIÓN DE LA SESIÓN</h5>
+                </div>
+                <div class="card-body">
+                    <div class="info-item mb-3">
+                        <strong>🏁 Circuito:</strong><br>
+                        <span>{{ race.circuit.name }}</span>
+                    </div>
+                    <div class="info-item mb-3">
+                        <strong>📍 País:</strong><br>
+                        <span>{{ race.circuit.country }}</span>
+                    </div>
+                    
+                    {% if session_type == 'qualifying' %}
+                    <div class="info-item mb-3">
+                        <strong>⏱️ Formato:</strong><br>
+                        <span>Q1, Q2, Q3</span>
+                    </div>
+                    {% else %}
+                    <div class="info-item mb-3">
+                        <strong>📊 Distancia:</strong><br>
+                        <span>{{ race.circuit.laps }} vueltas</span>
+                    </div>
+                    <div class="info-item mb-3">
+                        <strong>🏆 Puntos:</strong><br>
+                        <span>1°: 25pts, 2°: 18pts, 3°: 15pts, ... +VL: 1pt</span>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="info-item">
+                        <strong>🕐 Hora local:</strong><br>
+                        <span id="local-time">--:--:--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Solo mostrar tabla de tiempos en carrera, no en qualifying -->
+            {% if session_type == 'race' %}
+            <!-- Tabla de Tiempos por Vuelta -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">⏱️ TIEMPOS POR VUELTA</h5>
+                    <button class="btn btn-sm btn-outline-primary" onclick="loadLapTimes()">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div style="max-height: 400px; overflow-y: auto;" id="lap-times-table">
+                        <div class="text-center p-3">
+                            <div class="spinner-border spinner-border-sm" role="status">
+                                <span class="visually-hidden">Cargando...</span>
+                            </div>
+                            <small class="text-muted">Cargando tiempos...</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Clasificación/Resultados en tiempo real -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        {% if session_type == 'qualifying' %}📊 CLASIFICACIÓN{% else %}🏆 RESULTADOS{% endif %}
+                    </h5>
+                    <button class="btn btn-sm btn-outline-primary" onclick="loadStandings()">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div style="max-height: 300px; overflow-y: auto;" id="live-standings">
+                        <div class="text-center p-3">
+                            <div class="spinner-border spinner-border-sm" role="status">
+                                <span class="visually-hidden">Cargando...</span>
+                            </div>
+                            <small class="text-muted">Cargando datos...</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.info-item {
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.info-item:last-child {
+    border-bottom: none;
+}
+
+#live-events .alert {
+    margin-bottom: 0.5rem;
+    border-left: 4px solid;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(-10px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.standings-row {
+    padding: 6px 8px;
+    border-bottom: 1px solid #eee;
+    font-size: 0.85rem;
+}
+
+.standings-row:hover {
+    background-color: #f8f9fa;
+}
+
+.standings-position {
+    font-weight: bold;
+    width: 40px;
+    text-align: center;
+    font-size: 1.1em;
+}
+
+.driver-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #007bff;
+    color: white;
+    font-size: 0.8rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+    font-weight: bold;
+}
+
+/* Estilos para la pole position */
+.pole-highlight {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%) !important;
+    border-left: 4px solid #ffc107 !important;
+}
+
+.standings-row.pole {
+    animation: pulsePole 2s infinite;
+}
+
+@keyframes pulsePole {
+    0% { background-color: rgba(255, 193, 7, 0.1); }
+    50% { background-color: rgba(255, 193, 7, 0.3); }
+    100% { background-color: rgba(255, 193, 7, 0.1); }
+}
+
+/* Estilos para DNF en carrera */
+.dnf-row {
+    background-color: rgba(220, 53, 69, 0.1) !important;
+    color: #6c757d !important;
+    text-decoration: line-through;
+}
+
+/* Mejoras para eventos */
+.qualifying-event {
+    border-left: 4px solid #17a2b8;
+}
+
+.pole-event {
+    border-left: 4px solid #ffc107;
+    background-color: rgba(255, 193, 7, 0.1);
+}
+
+.elimination-event {
+    border-left: 4px solid #dc3545;
+    background-color: rgba(220, 53, 69, 0.1);
+}
+
+.race-event {
+    border-left: 4px solid #28a745;
+}
+
+.dnf-event {
+    border-left: 4px solid #dc3545;
+    background-color: rgba(220, 53, 69, 0.1);
+}
+
+/* Animación de giro para botones de actualizar */
+.refreshing {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Estilos para la tabla de tiempos */
+.driver-badge {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: bold;
+    color: white;
+}
+
+.table-sm td {
+    padding: 0.4rem 0.5rem;
+    font-size: 0.8rem;
+    vertical-align: middle;
+}
+
+.table-success {
+    background-color: rgba(25, 135, 84, 0.05) !important;
+    border-left: 3px solid #198754;
+}
+
+.table-info {
+    background-color: rgba(13, 202, 240, 0.05) !important;
+    border-left: 3px solid #0dcaf0;
+}
+
+.table thead th {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background-color: #f8f9fa;
+}
+
+/* Animación suave para nuevas filas */
+@keyframes newRowHighlight {
+    0% { background-color: rgba(255, 193, 7, 0.2); }
+    100% { background-color: transparent; }
+}
+
+.new-time {
+    animation: newRowHighlight 3s ease-out;
+}
+
+/* Mejorar la legibilidad */
+.lap-time-table tr:hover {
+    background-color: rgba(0, 123, 255, 0.05);
+}
+
+.gap-positive {
+    color: #dc3545;
+}
+
+.gap-negative {
+    color: #198754;
+}
+
+.session-indicator {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.q1-session { background-color: #6c757d; color: white; }
+.q2-session { background-color: #17a2b8; color: white; }
+.q3-session { background-color: #ffc107; color: black; }
+
+/* Estilos para notificaciones */
+.notification-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    min-width: 300px;
+}
+
+.notification {
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    margin-bottom: 10px;
+}
+</style>
+
+<script>
+// Variables globales
+const sessionType = "{{ session_type }}"; // 'qualifying' o 'race'
+let currentLapTimes = [];
+
+// Inicialización
+document.addEventListener('DOMContentLoaded', function() {
+    console.log(`Iniciando transmisión de ${sessionType} para {{ race.circuit.name }}`);
+    
+    // Cargar datos iniciales (solo una vez, sin auto-refresh)
+    loadLiveEvents();
+    loadStandings();
+    
+    // Solo cargar tiempos de vuelta si es carrera
+    if (sessionType === 'race') {
+        loadLapTimes();
+    }
+    
+    // Actualizar hora local
+    updateLocalTime();
+    setInterval(updateLocalTime, 1000);
+});
+
+// Actualizar hora local
+function updateLocalTime() {
+    const now = new Date();
+    document.getElementById('local-time').textContent = 
+        now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+// FUNCIÓN MEJORADA DE ACTUALIZACIÓN DE EVENTOS
+function refreshEvents() {
+    console.log("🔄 Actualizando eventos manualmente...");
+    
+    // Animación del botón
+    const refreshBtn = document.querySelector('button[onclick="refreshEvents()"]');
+    const icon = refreshBtn.querySelector('i');
+    icon.classList.add('refreshing');
+    
+    // Mostrar indicador de carga
+    const eventsContainer = document.getElementById('live-events');
+    eventsContainer.innerHTML = `
+        <div class="text-center p-3">
+            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                <span class="visually-hidden">Actualizando...</span>
+            </div>
+            <small class="text-muted">Actualizando eventos...</small>
+        </div>
+    `;
+    
+    // Recargar eventos
+    fetch(`/api/live_session_events/{{ race.id }}/{{ session_type }}`)
+        .then(response => response.json())
+        .then(events => {
+            // Quitar animación
+            icon.classList.remove('refreshing');
+            
+            // Actualizar interfaz
+            updateEventsDisplay(events);
+        })
+        .catch(error => {
+            // Quitar animación en caso de error
+            icon.classList.remove('refreshing');
+            console.error('Error actualizando eventos:', error);
+        });
+}
+
+function updateEventsDisplay(events) {
+    const eventsContainer = document.getElementById('live-events');
+    const eventsCount = document.getElementById('events-count');
+    
+    eventsContainer.innerHTML = '';
+    eventsCount.textContent = events.length;
+    
+    if (events.length === 0) {
+        eventsContainer.innerHTML = `
+            <div class="text-center p-4 text-muted">
+                <i class="fas fa-flag-checkered fa-2x mb-2"></i>
+                <p>Esperando inicio de sesión</p>
+                <small>Los eventos y tiempos aparecerán aquí</small>
+            </div>
+        `;
+        return;
+    }
+    
+    // Filtrar eventos para mostrar solo los importantes
+    const importantEvents = events.filter(event => 
+        !event.type.includes('lap_time') || 
+        event.type.includes('fast_lap') ||
+        event.type.includes('personal_best') ||
+        event.type.includes('pole') ||
+        event.type.includes('eliminated')
+    );
+    
+    importantEvents.forEach(event => {
+        const eventElement = document.createElement('div');
+        eventElement.className = `alert ${getEventClass(event.type)} mb-0 border-0 rounded-0`;
+        
+        if (event.type.includes('qualifying')) {
+            eventElement.classList.add('qualifying-event');
+        } else if (event.type.includes('race')) {
+            eventElement.classList.add('race-event');
+        }
+        
+        let eventIcon = '📡';
+        if (event.type.includes('fast_lap')) eventIcon = '🚀';
+        if (event.type.includes('eliminated')) eventIcon = '❌';
+        if (event.type.includes('pole')) eventIcon = '🏆';
+        if (event.type.includes('dnf')) eventIcon = '💥';
+        if (event.type.includes('start')) eventIcon = '🏁';
+        if (event.type.includes('end')) eventIcon = '⏱️';
+        
+        eventElement.innerHTML = `
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="flex-grow-1">
+                    <div class="d-flex align-items-center mb-1">
+                        <span class="me-2">${eventIcon}</span>
+                        <strong class="d-block">${event.title}</strong>
+                    </div>
+                    <small class="d-block mt-1">${event.description}</small>
+                    ${event.lap > 0 ? `
+                    <small class="text-muted mt-1 d-block">
+                        <i class="fas fa-flag"></i> Vuelta ${event.lap}
+                    </small>
+                    ` : ''}
+                </div>
+                <small class="text-muted ms-2 text-nowrap">
+                    ${new Date(event.timestamp).toLocaleTimeString('es-ES', { 
+                        hour: '2-digit', 
+                        minute: '2-digit',
+                        second: '2-digit'
+                    })}
+                </small>
+            </div>
+        `;
+        eventsContainer.prepend(eventElement);
+    });
+    
+    // Si no hay eventos importantes, mostrar mensaje
+    if (importantEvents.length === 0) {
+        eventsContainer.innerHTML = `
+            <div class="text-center p-4 text-muted">
+                <i class="fas fa-stopwatch fa-2x mb-2"></i>
+                <p>Registrando tiempos de vuelta</p>
+                <small>Consulta la tabla de tiempos para ver los detalles</small>
+            </div>
+        `;
+    }
+}
+
+// Cargar eventos en vivo (solo una vez)
+function loadLiveEvents() {
+    const apiUrl = `/api/live_session_events/{{ race.id }}/{{ session_type }}`;
+    
+    fetch(apiUrl)
+        .then(response => {
+            if (!response.ok) throw new Error('Error en la respuesta');
+            return response.json();
+        })
+        .then(events => {
+            const eventsContainer = document.getElementById('live-events');
+            const loadingElement = document.getElementById('events-loading');
+            const eventsCount = document.getElementById('events-count');
+            
+            if (loadingElement) {
+                loadingElement.remove();
+            }
+            
+            updateEventsDisplay(events);
+        })
+        .catch(error => {
+            console.error('Error cargando eventos:', error);
+        });
+}
+
+// FUNCIÓN MEJORADA PARA CARGAR CLASIFICACIÓN
+function loadStandings() {
+    const standingsContainer = document.getElementById('live-standings');
+    
+    // Determinar qué API usar según el tipo de sesión
+    const apiUrl = sessionType === 'qualifying' 
+        ? `/api/qualifying_results/{{ race.id }}`
+        : `/api/race_results/{{ race.id }}`;
+    
+    // Mostrar loading
+    standingsContainer.innerHTML = `
+        <div class="text-center p-3">
+            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+            <small class="text-muted">Cargando ${sessionType === 'qualifying' ? 'clasificación' : 'resultados'}...</small>
+        </div>
+    `;
+    
+    fetch(apiUrl)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(standings => {
+            console.log(`Datos de ${sessionType} recibidos:`, standings);
+            
+            let standingsHTML = '';
+            
+            if (!standings || standings.length === 0) {
+                standingsHTML = `
+                    <div class="text-center p-3 text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        <small>No hay datos ${sessionType === 'qualifying' ? 'de clasificación' : 'de carrera'} disponibles</small>
+                        <br>
+                        <small class="text-muted">Ejecuta la simulación para generar resultados</small>
+                    </div>
+                `;
+            } else {
+                if (sessionType === 'qualifying') {
+                    // Renderizar clasificación
+                    standings.forEach((result, index) => {
+                        const position = result.final_position || index + 1;
+                        const bestTime = result.q3_time || result.q2_time || result.q1_time;
+                        const isPole = position === 1;
+                        
+                        standingsHTML += `
+                            <div class="standings-row d-flex align-items-center ${isPole ? 'pole' : ''}">
+                                <div class="standings-position">
+                                    ${position}
+                                    ${isPole ? '🥇' : position === 2 ? '🥈' : position === 3 ? '🥉' : ''}
+                                </div>
+                                <div class="driver-avatar bg-${getTyreColor(result.tyre_choice)}">
+                                    ${result.driver_name.split(' ').map(n => n[0]).join('')}
+                                </div>
+                                <div class="flex-grow-1">
+                                    <strong class="d-block">${result.driver_name}</strong>
+                                    <small class="text-muted">${result.team_name}</small>
+                                </div>
+                                <div class="text-end">
+                                    <div class="fw-bold">${bestTime ? bestTime.toFixed(3) + 's' : 'N/A'}</div>
+                                    <small class="badge bg-${getTyreColor(result.tyre_choice)}">${getTyreName(result.tyre_choice)}</small>
+                                    ${isPole ? '<small class="badge bg-success ms-1">POLE</small>' : ''}
+                                </div>
+                            </div>
+                        `;
+                    });
+                } else {
+                    // Renderizar resultados de carrera
+                    standings.forEach((result, index) => {
+                        const position = result.position || index + 1;
+                        const isWinner = position === 1;
+                        const isDNF = result.dnf;
+                        
+                        standingsHTML += `
+                            <div class="standings-row d-flex align-items-center ${isDNF ? 'dnf-row' : ''} ${isWinner ? 'pole' : ''}">
+                                <div class="standings-position">
+                                    ${isDNF ? 'DNF' : position}
+                                    ${isWinner ? '🥇' : position === 2 ? '🥈' : position === 3 ? '🥉' : ''}
+                                </div>
+                                <div class="driver-avatar bg-${isDNF ? 'secondary' : 'primary'}">
+                                    ${result.driver_name.split(' ').map(n => n[0]).join('')}
+                                </div>
+                                <div class="flex-grow-1">
+                                    <strong class="d-block">${result.driver_name}</strong>
+                                    <small class="text-muted">${result.team_name}</small>
+                                    ${isDNF ? '<small class="badge bg-danger">ABANDONO</small>' : ''}
+                                </div>
+                                <div class="text-end">
+                                    <div class="fw-bold">${result.points > 0 ? '+' + result.points + ' pts' : '0 pts'}</div>
+                                    ${result.fastest_lap ? '<small class="badge bg-success ms-1">VL</small>' : ''}
+                                    ${isWinner ? '<small class="badge bg-warning ms-1">GANADOR</small>' : ''}
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+            }
+            
+            standingsContainer.innerHTML = standingsHTML;
+        })
+        .catch(error => {
+            console.error(`Error cargando ${sessionType}:`, error);
+            standingsContainer.innerHTML = `
+                <div class="text-center p-3 text-danger">
+                    <i class="fas fa-exclamation-triangle me-1"></i>
+                    <small>Error cargando ${sessionType === 'qualifying' ? 'clasificación' : 'resultados'}</small>
+                    <br>
+                    <small class="text-muted">${error.message}</small>
+                </div>
+            `;
+        });
+}
+
+// FUNCIÓN PARA CARGAR TIEMPOS POR VUELTA (solo para carrera)
+function loadLapTimes() {
+    const lapTimesContainer = document.getElementById('lap-times-table');
+    
+    // Mostrar loading
+    lapTimesContainer.innerHTML = `
+        <div class="text-center p-3">
+            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+            <small class="text-muted">Cargando tiempos por vuelta...</small>
+        </div>
+    `;
+
+    // Solo cargar para carrera
+    const apiUrl = `/api/lap_times/race/{{ race.id }}`;
+
+    fetch(apiUrl)
+        .then(response => {
+            if (!response.ok) throw new Error('Error en la respuesta');
+            return response.json();
+        })
+        .then(lapTimes => {
+            currentLapTimes = lapTimes;
+            updateLapTimesDisplay(lapTimes);
+        })
+        .catch(error => {
+            console.error('Error cargando tiempos por vuelta:', error);
+            lapTimesContainer.innerHTML = `
+                <div class="text-center p-3 text-danger">
+                    <i class="fas fa-exclamation-triangle me-1"></i>
+                    <small>Error cargando tiempos</small>
+                </div>
+            `;
+        });
+}
+
+// FUNCIÓN PARA ACTUALIZAR LA TABLA DE TIEMPOS CON DIFERENCIAS
+function updateLapTimesDisplay(lapTimes) {
+    const lapTimesContainer = document.getElementById('lap-times-table');
+    
+    if (!lapTimes || lapTimes.length === 0) {
+        lapTimesContainer.innerHTML = `
+            <div class="text-center p-3 text-muted">
+                <i class="fas fa-flag me-1"></i>
+                <small>No hay tiempos registrados aún</small>
+                <br>
+                <small class="text-muted">Los tiempos aparecerán aquí durante la sesión</small>
+            </div>
+        `;
+        return;
+    }
+
+    let lapTimesHTML = `
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0 lap-time-table">
+                <thead class="table-light">
+                    <tr>
+                        <th class="small">Pos</th>
+                        <th class="small">Piloto</th>
+                        <th class="small text-end">Tiempo</th>
+                        <th class="small text-end">Diferencia</th>
+                        <th class="small text-center">Vuelta</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    lapTimes.forEach((lap, index) => {
+        const position = index + 1;
+        const isSessionBest = lap.is_session_best;
+        const isPersonalBest = lap.is_personal_best;
+        const gapToLeader = lap.gap_to_leader || 0;
+        
+        let rowClass = '';
+        if (isSessionBest) rowClass = 'table-success';
+        else if (isPersonalBest) rowClass = 'table-info';
+        
+        let gapDisplay = '';
+        if (position === 1) {
+            gapDisplay = '<small class="text-success">LÍDER</small>';
+        } else {
+            gapDisplay = `+${formatLapTime(gapToLeader)}`;
+        }
+        
+        // Iconos especiales
+        let lapIcon = '';
+        if (isSessionBest) lapIcon = '🚀';
+        else if (isPersonalBest) lapIcon = '⭐';
+        else if (lap.lap_type === 'out') lapIcon = '🚗';
+        else if (lap.lap_type === 'in') lapIcon = '⏱️';
+        
+        lapTimesHTML += `
+            <tr class="${rowClass}">
+                <td class="small fw-bold">
+                    ${position}
+                    ${position === 1 ? '🥇' : position === 2 ? '🥈' : position === 3 ? '🥉' : ''}
+                </td>
+                <td class="small">
+                    <div class="d-flex align-items-center">
+                        <span class="driver-badge bg-${getTyreColor(lap.tyre_type)} me-2">
+                            ${lap.driver_initials}
+                        </span>
+                        <div>
+                            <div class="fw-bold">${lap.driver_name.split(' ')[0]}</div>
+                            <small class="text-muted">${lap.team_name}</small>
+                        </div>
+                    </div>
+                </td>
+                <td class="small text-end fw-bold">
+                    ${formatLapTime(lap.lap_time)}
+                    ${lapIcon}
+                </td>
+                <td class="small text-end ${position === 1 ? 'text-success' : 'text-muted'}">
+                    ${gapDisplay}
+                </td>
+                <td class="small text-center">
+                    <span class="badge bg-${getLapStatusColor(lap)}">
+                        ${lap.lap_number}
+                    </span>
+                </td>
+            </tr>
+        `;
+    });
+
+    lapTimesHTML += `
+                </tbody>
+            </table>
+        </div>
+        <div class="p-2 border-top bg-light">
+            <small class="text-muted">
+                <i class="fas fa-info-circle me-1"></i>
+                Tiempos de carrera - Diferencias respecto al líder
+            </small>
+        </div>
+    `;
+
+    lapTimesContainer.innerHTML = lapTimesHTML;
+}
+
+// FUNCIONES AUXILIARES PARA TIEMPOS
+function formatLapTime(timeInSeconds) {
+    if (!timeInSeconds || timeInSeconds <= 0) return '--:--.---';
+    
+    const minutes = Math.floor(timeInSeconds / 60);
+    const seconds = (timeInSeconds % 60).toFixed(3);
+    return `${minutes}:${seconds.padStart(6, '0')}`;
+}
+
+function getLapStatusColor(lap) {
+    if (lap.lap_type === 'out') return 'secondary';
+    if (lap.lap_type === 'in') return 'info';
+    if (lap.is_session_best) return 'success';
+    if (lap.is_personal_best) return 'primary';
+    if (lap.tyre_type === 'wet' || lap.tyre_type === 'extreme_wet') return 'warning';
+    return 'dark';
+}
+
+// FUNCIONES PARA SIMULACIÓN EN SEGUNDO PLANO
+function simulateQualifying() {
+    console.log("🏁 Iniciando simulación de clasificación en segundo plano...");
+    
+    // Mostrar notificación de inicio
+    showNotification('🏁 Iniciando simulación de clasificación en segundo plano...', 'info');
+    
+    // Deshabilitar botón temporalmente
+    const simulateBtn = document.getElementById('simulate-btn');
+    if (simulateBtn) {
+        simulateBtn.disabled = true;
+        simulateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Iniciando...';
+    }
+    
+    // Iniciar simulación en segundo plano
+    fetch(`/api/simulate_qualifying_live/{{ race.id }}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification(data.message, 'success');
+                
+                // Redirigir inmediatamente a la página de transmisión
+                setTimeout(() => {
+                    window.location.href = data.redirect_url;
+                }, 1000);
+                
+            } else {
+                showNotification(data.message, 'danger');
+                // Rehabilitar botón en caso de error
+                if (simulateBtn) {
+                    simulateBtn.disabled = false;
+                    simulateBtn.innerHTML = '<i class="fas fa-play"></i> Simular Clasificación en Vivo';
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error iniciando simulación:', error);
+            showNotification('Error al iniciar la simulación', 'danger');
+            // Rehabilitar botón en caso de error
+            if (simulateBtn) {
+                simulateBtn.disabled = false;
+                simulateBtn.innerHTML = '<i class="fas fa-play"></i> Simular Clasificación en Vivo';
+            }
+        });
+}
+
+function simulateRace() {
+    console.log("🏎️ Iniciando simulación de carrera en segundo plano...");
+    
+    // Mostrar notificación de inicio
+    showNotification('🏎️ Iniciando simulación de carrera en segundo plano...', 'info');
+    
+    // Deshabilitar botón temporalmente
+    const simulateBtn = document.getElementById('simulate-btn');
+    if (simulateBtn) {
+        simulateBtn.disabled = true;
+        simulateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Iniciando...';
+    }
+    
+    // Iniciar simulación en segundo plano
+    fetch(`/api/simulate_race_live/{{ race.id }}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification(data.message, 'success');
+                
+                // Redirigir inmediatamente a la página de transmisión
+                setTimeout(() => {
+                    window.location.href = data.redirect_url;
+                }, 1000);
+                
+            } else {
+                showNotification(data.message, 'danger');
+                // Rehabilitar botón en caso de error
+                if (simulateBtn) {
+                    simulateBtn.disabled = false;
+                    simulateBtn.innerHTML = '<i class="fas fa-play"></i> Simular Carrera en Vivo';
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error iniciando simulación:', error);
+            showNotification('Error al iniciar la simulación', 'danger');
+            // Rehabilitar botón en caso de error
+            if (simulateBtn) {
+                simulateBtn.disabled = false;
+                simulateBtn.innerHTML = '<i class="fas fa-play"></i> Simular Carrera en Vivo';
+            }
+        });
+}
+
+// FUNCIÓN PARA MOSTRAR NOTIFICACIONES
+function showNotification(message, type = 'info') {
+    // Crear contenedor de notificaciones si no existe
+    let notificationContainer = document.querySelector('.notification-container');
+    if (!notificationContainer) {
+        notificationContainer = document.createElement('div');
+        notificationContainer.className = 'notification-container';
+        document.body.appendChild(notificationContainer);
+    }
+    
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type} alert-dismissible fade show notification`;
+    
+    notification.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    notificationContainer.appendChild(notification);
+    
+    // Auto-eliminar después de 5 segundos
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 5000);
+}
+
+// Funciones auxiliares
+function getEventClass(eventType) {
+    const classes = {
+        'qualifying_start': 'alert-primary',
+        'qualifying_end': 'alert-warning',
+        'qualifying_fast_lap': 'alert-success',
+        'qualifying_incident': 'alert-danger',
+        'qualifying_spin': 'alert-warning',
+        'qualifying_eliminated': 'alert-dark',
+        'qualifying_pole': 'alert-warning',
+        'race_start': 'alert-primary',
+        'race_finish': 'alert-success',
+        'race_overtake': 'alert-info',
+        'race_pit_stop': 'alert-secondary',
+        'race_spin': 'alert-warning',
+        'race_fast_lap': 'alert-success',
+        'race_dnf': 'alert-dark',
+        'race_safety_car': 'alert-warning',
+        'race_virtual_safety_car': 'alert-info',
+        'race_tyre_issue': 'alert-danger'
+    };
+    return classes[eventType] || 'alert-secondary';
+}
+
+function getTyreColor(tyreType) {
+    const colors = { 
+        'soft': 'danger', 'medium': 'warning', 'hard': 'secondary',
+        'wet': 'info', 'extreme_wet': 'primary'
+    };
+    return colors[tyreType] || 'primary';
+}
+
+function getTyreName(tyreType) {
+    const names = { 
+        'soft': 'S', 'medium': 'M', 'hard': 'H',
+        'wet': 'W', 'extreme_wet': 'X'
+    };
+    return names[tyreType] || tyreType;
+}
+
+// Actualizar horas locales
+document.querySelectorAll('[data-session-time]').forEach(element => {
+    const utcTime = element.getAttribute('data-session-time');
+    if (utcTime) {
+        try {
+            const localTime = new Date(utcTime).toLocaleString('es-ES');
+            element.textContent = localTime;
+        } catch (error) {
+            console.error('Error al convertir la hora:', error);
+        }
+    }
+});
+</script>
+{% endblock %}

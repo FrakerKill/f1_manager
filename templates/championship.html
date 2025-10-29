@@ -3,193 +3,192 @@
 {% block title %}Clasificación{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-12">
-        <h1>🏆 Clasificación del Campeonato</h1>
-        <p class="text-muted">Sigue la lucha por el título mundial de F1 2025</p>
-        
-        <!-- Navegación por pestañas -->
-        <ul class="nav nav-tabs mb-4" id="championshipTabs">
-            <li class="nav-item">
-                <a class="nav-link active" data-bs-toggle="tab" href="#drivers">
-                    <i class="fas fa-user"></i> Pilotos
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" data-bs-toggle="tab" href="#teams">
-                    <i class="fas fa-users"></i> Escuderías
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" data-bs-toggle="tab" href="#races">
-                    <i class="fas fa-flag-checkered"></i> Por Carrera
-                </a>
-            </li>
-        </ul>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="h3 mb-3">🏆 Clasificación del Campeonato</h1>
+            <p class="text-muted small">Sigue la lucha por el título mundial de F1 2025</p>
+            
+            <!-- Navegación por pestañas -->
+            <ul class="nav nav-tabs mb-3" id="championshipTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="drivers-tab" data-bs-toggle="tab" data-bs-target="#drivers" type="button" role="tab">
+                        <i class="fas fa-user d-none d-sm-inline"></i> Pilotos
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="teams-tab" data-bs-toggle="tab" data-bs-target="#teams" type="button" role="tab">
+                        <i class="fas fa-users d-none d-sm-inline"></i> Escuderías
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="races-tab" data-bs-toggle="tab" data-bs-target="#races" type="button" role="tab">
+                        <i class="fas fa-flag-checkered d-none d-sm-inline"></i> Por Carrera
+                    </button>
+                </li>
+            </ul>
 
-        <!-- Contenido de las pestañas -->
-        <div class="tab-content">
-            <!-- Pestaña de Pilotos -->
-            <div class="tab-pane fade show active" id="drivers">
-                <div class="card">
-                    <div class="card-header bg-dark text-white">
-                        <h5 class="mb-0">
-                            <i class="fas fa-trophy"></i> Clasificación de Pilotos - Campeonato Mundial
-                        </h5>
-                    </div>
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-hover mb-0">
-                                <thead class="table-dark">
-                                    <tr>
-                                        <th width="80">Pos</th>
-                                        <th>Piloto</th>
-                                        <th>Escudería</th>
-                                        <th width="120">Puntos</th>
-                                        <th width="100">Carreras</th>
-                                        <th width="100">Diferencia</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for standing in driver_standings %}
-                                    {% set points = standing.total_points or 0 %}
-                                    <tr class="{% if loop.index == 1 %}table-warning{% elif loop.index == 2 %}table-light{% elif loop.index == 3 %}table-info{% endif %}">
-                                        <td>
-                                            <strong>{{ loop.index }}</strong>
-                                            {% if loop.index <= 3 %}
-                                            <i class="fas fa-trophy {% if loop.index == 1 %}text-warning{% elif loop.index == 2 %}text-secondary{% else %}text-info{% endif %}"></i>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            <div class="d-flex align-items-center">
-                                                <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 30px; height: 30px; font-size: 0.8rem; font-weight: bold;">
-                                                    {{ standing.team_name[:2] }}
-                                                </div>
-                                                <strong>{{ standing.name }}</strong>
-                                            </div>
-                                        </td>
-                                        <td>{{ standing.team_name }}</td>
-                                        <td>
-                                            <span class="badge bg-danger">{{ points }}</span>
-                                        </td>
-                                        <td>{{ standing.races_entered or 0 }}</td>
-                                        <td>
-                                            {% if loop.index > 1 %}
-                                            {% set leader_points = (driver_standings[0].total_points or 0) %}
-                                            <span class="text-muted">-{{ leader_points - points }}</span>
-                                            {% else %}
-                                            <strong>-</strong>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                    {% else %}
-                                    <tr>
-                                        <td colspan="6" class="text-center text-muted py-4">
-                                            <i class="fas fa-flag-checkered fa-2x mb-2"></i><br>
-                                            No hay resultados de carreras todavía
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+            <!-- Contenido de las pestañas -->
+            <div class="tab-content">
+                <!-- Pestaña de Pilotos -->
+                <div class="tab-pane fade show active" id="drivers" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header bg-dark text-white py-2">
+                            <h6 class="mb-0">Clasificación de Pilotos</h6>
                         </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Pestaña de Escuderías -->
-            <div class="tab-pane fade" id="teams">
-                <div class="card">
-                    <div class="card-header bg-dark text-white">
-                        <h5 class="mb-0">
-                            <i class="fas fa-trophy"></i> Clasificación de Escuderías - Campeonato Mundial
-                        </h5>
-                    </div>
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-hover mb-0">
-                                <thead class="table-dark">
-                                    <tr>
-                                        <th width="80">Pos</th>
-                                        <th>Escudería</th>
-                                        <th width="120">Puntos</th>
-                                        <th width="100">Carreras</th>
-                                        <th width="100">Diferencia</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for standing in team_standings %}
-                                    {% set points = standing.total_points or 0 %}
-                                    <tr class="{% if loop.index == 1 %}table-warning{% elif loop.index == 2 %}table-light{% elif loop.index == 3 %}table-info{% endif %}">
-                                        <td>
-                                            <strong>{{ loop.index }}</strong>
-                                            {% if loop.index <= 3 %}
-                                            <i class="fas fa-trophy {% if loop.index == 1 %}text-warning{% elif loop.index == 2 %}text-secondary{% else %}text-info{% endif %}"></i>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            <div class="d-flex align-items-center">
-                                                <div class="bg-danger text-white rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 30px; height: 30px; font-size: 0.8rem; font-weight: bold;">
-                                                    {{ standing.team_name[:2] }}
+                        <div class="card-body p-0">
+                            <div class="table-responsive scroll-container">
+                                <table class="table table-hover mb-0 small">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th width="60">Pos</th>
+                                            <th>Piloto</th>
+                                            <th class="d-none d-md-table-cell">Escudería</th>
+                                            <th width="80">Puntos</th>
+                                            <th width="70" class="d-none d-sm-table-cell">Carreras</th>
+                                            <th width="80" class="d-none d-lg-table-cell">Diferencia</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for standing in driver_standings %}
+                                        {% set points = standing.total_points or 0 %}
+                                        <tr class="{% if loop.index == 1 %}table-warning{% elif loop.index == 2 %}table-light{% elif loop.index == 3 %}table-info{% endif %}">
+                                            <td>
+                                                <strong>{{ loop.index }}</strong>
+                                                {% if loop.index <= 3 %}
+                                                <i class="fas fa-trophy {% if loop.index == 1 %}text-warning{% elif loop.index == 2 %}text-secondary{% else %}text-info{% endif %}"></i>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 28px; height: 28px; font-size: 0.7rem; font-weight: bold;">
+                                                        {{ standing.team_name[:2] }}
+                                                    </div>
+                                                    <div>
+                                                        <strong class="d-block">{{ standing.name }}</strong>
+                                                        <small class="text-muted d-md-none">{{ standing.team_name }}</small>
+                                                    </div>
                                                 </div>
-                                                <strong>{{ standing.team_name }}</strong>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-danger">{{ points }}</span>
-                                        </td>
-                                        <td>{{ standing.races_entered or 0 }}</td>
-                                        <td>
-                                            {% if loop.index > 1 %}
-                                            {% set leader_points = (team_standings[0].total_points or 0) %}
-                                            <span class="text-muted">-{{ leader_points - points }}</span>
-                                            {% else %}
-                                            <strong>-</strong>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                    {% else %}
-                                    <tr>
-                                        <td colspan="5" class="text-center text-muted py-4">
-                                            <i class="fas fa-flag-checkered fa-2x mb-2"></i><br>
-                                            No hay resultados de carreras todavía
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Pestaña por Carrera -->
-            <div class="tab-pane fade" id="races">
-                <div class="card">
-                    <div class="card-header bg-dark text-white">
-                        <h5 class="mb-0">
-                            <i class="fas fa-flag-checkered"></i> Resultados por Carrera
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label for="raceSelect" class="form-label">Seleccionar Carrera:</label>
-                                <select class="form-select" id="raceSelect">
-                                    <option value="">Selecciona una carrera...</option>
-                                    {% for race in races %}
-                                    <option value="{{ race.id }}">
-                                        R{{ race.round_number }}: {{ race.circuit.name }} ({{ race.circuit.country }})
-                                    </option>
-                                    {% endfor %}
-                                </select>
+                                            </td>
+                                            <td class="d-none d-md-table-cell">{{ standing.team_name }}</td>
+                                            <td>
+                                                <span class="badge bg-danger">{{ points }}</span>
+                                            </td>
+                                            <td class="d-none d-sm-table-cell">{{ standing.races_entered or 0 }}</td>
+                                            <td class="d-none d-lg-table-cell">
+                                                {% if loop.index > 1 %}
+                                                {% set leader_points = (driver_standings[0].total_points or 0) %}
+                                                <span class="text-muted">-{{ leader_points - points }}</span>
+                                                {% else %}
+                                                <strong>-</strong>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% else %}
+                                        <tr>
+                                            <td colspan="6" class="text-center text-muted py-4">
+                                                <i class="fas fa-flag-checkered fa-2x mb-2"></i><br>
+                                                No hay resultados todavía
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
-                        
-                        <div id="raceResults">
-                            <div class="text-center text-muted py-5">
-                                <i class="fas fa-flag-checkered fa-3x mb-3"></i><br>
-                                Selecciona una carrera para ver los resultados
+                    </div>
+                </div>
+
+                <!-- Pestaña de Escuderías -->
+                <div class="tab-pane fade" id="teams" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header bg-dark text-white py-2">
+                            <h6 class="mb-0">Clasificación de Escuderías</h6>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive scroll-container">
+                                <table class="table table-hover mb-0 small">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th width="60">Pos</th>
+                                            <th>Escudería</th>
+                                            <th width="80">Puntos</th>
+                                            <th width="70" class="d-none d-sm-table-cell">Carreras</th>
+                                            <th width="80" class="d-none d-lg-table-cell">Diferencia</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for standing in team_standings %}
+                                        {% set points = standing.total_points or 0 %}
+                                        <tr class="{% if loop.index == 1 %}table-warning{% elif loop.index == 2 %}table-light{% elif loop.index == 3 %}table-info{% endif %}">
+                                            <td>
+                                                <strong>{{ loop.index }}</strong>
+                                                {% if loop.index <= 3 %}
+                                                <i class="fas fa-trophy {% if loop.index == 1 %}text-warning{% elif loop.index == 2 %}text-secondary{% else %}text-info{% endif %}"></i>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="bg-danger text-white rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 28px; height: 28px; font-size: 0.7rem; font-weight: bold;">
+                                                        {{ standing.team_name[:2] }}
+                                                    </div>
+                                                    <strong>{{ standing.team_name }}</strong>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-danger">{{ points }}</span>
+                                            </td>
+                                            <td class="d-none d-sm-table-cell">{{ standing.races_entered or 0 }}</td>
+                                            <td class="d-none d-lg-table-cell">
+                                                {% if loop.index > 1 %}
+                                                {% set leader_points = (team_standings[0].total_points or 0) %}
+                                                <span class="text-muted">-{{ leader_points - points }}</span>
+                                                {% else %}
+                                                <strong>-</strong>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% else %}
+                                        <tr>
+                                            <td colspan="5" class="text-center text-muted py-4">
+                                                <i class="fas fa-flag-checkered fa-2x mb-2"></i><br>
+                                                No hay resultados todavía
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pestaña por Carrera -->
+                <div class="tab-pane fade" id="races" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header bg-dark text-white py-2">
+                            <h6 class="mb-0">Resultados por Carrera</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-12">
+                                    <label for="raceSelect" class="form-label small">Seleccionar Carrera:</label>
+                                    <select class="form-select" id="raceSelect">
+                                        <option value="">Selecciona una carrera...</option>
+                                        {% for race in races %}
+                                        <option value="{{ race.id }}">
+                                            R{{ race.round_number }}: {{ race.circuit.name }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div id="raceResults">
+                                <div class="text-center text-muted py-4">
+                                    <i class="fas fa-flag-checkered fa-2x mb-2"></i><br>
+                                    Selecciona una carrera para ver los resultados
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -197,63 +196,41 @@
             </div>
         </div>
     </div>
-</div>
 
-<!-- Información del sistema de puntos -->
-<div class="row mt-4">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header bg-light">
-                <h6 class="mb-0">📊 Sistema de Puntos F1</h6>
-            </div>
-            <div class="card-body">
-                <div class="row text-center">
-                    <div class="col-md-2">
-                        <span class="badge bg-primary">1º: 25 pts</span>
-                    </div>
-                    <div class="col-md-2">
-                        <span class="badge bg-primary">2º: 18 pts</span>
-                    </div>
-                    <div class="col-md-2">
-                        <span class="badge bg-primary">3º: 15 pts</span>
-                    </div>
-                    <div class="col-md-2">
-                        <span class="badge bg-secondary">4º: 12 pts</span>
-                    </div>
-                    <div class="col-md-2">
-                        <span class="badge bg-secondary">5º: 10 pts</span>
-                    </div>
-                    <div class="col-md-2">
-                        <span class="badge bg-success">⚡ +1 pt vuelta rápida</span>
-                    </div>
+    <!-- Información del sistema de puntos -->
+    <div class="row mt-3">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-light py-2">
+                    <h6 class="mb-0">📊 Sistema de Puntos F1</h6>
                 </div>
-                <small class="text-muted mt-2 d-block">* Punto extra por vuelta rápida solo si se termina en el top 10</small>
+                <div class="card-body py-2">
+                    <div class="row text-center">
+                        <div class="col-4 col-sm-2 mb-1">
+                            <span class="badge bg-primary">1º: 25</span>
+                        </div>
+                        <div class="col-4 col-sm-2 mb-1">
+                            <span class="badge bg-primary">2º: 18</span>
+                        </div>
+                        <div class="col-4 col-sm-2 mb-1">
+                            <span class="badge bg-primary">3º: 15</span>
+                        </div>
+                        <div class="col-4 col-sm-2 mb-1">
+                            <span class="badge bg-secondary">4º: 12</span>
+                        </div>
+                        <div class="col-4 col-sm-2 mb-1">
+                            <span class="badge bg-secondary">5º: 10</span>
+                        </div>
+                        <div class="col-4 col-sm-2 mb-1">
+                            <span class="badge bg-success">⚡ +1</span>
+                        </div>
+                    </div>
+                    <small class="text-muted mt-1 d-block text-center">* Punto extra por vuelta rápida solo en top 10</small>
+                </div>
             </div>
         </div>
     </div>
 </div>
-
-<style>
-.nav-tabs .nav-link {
-    color: #495057;
-    font-weight: 500;
-}
-
-.nav-tabs .nav-link.active {
-    background-color: #dc3545;
-    color: white;
-    border-color: #dc3545;
-}
-
-.table-hover tbody tr:hover {
-    background-color: rgba(220, 53, 69, 0.1);
-}
-
-.badge {
-    font-size: 0.9em;
-    padding: 0.5em 0.7em;
-}
-</style>
 
 <script>
 // Cargar resultados de carrera cuando se selecciona una
@@ -263,8 +240,8 @@ document.getElementById('raceSelect')?.addEventListener('change', function() {
     
     if (!raceId) {
         resultsContainer.innerHTML = `
-            <div class="text-center text-muted py-5">
-                <i class="fas fa-flag-checkered fa-3x mb-3"></i><br>
+            <div class="text-center text-muted py-4">
+                <i class="fas fa-flag-checkered fa-2x mb-2"></i><br>
                 Selecciona una carrera para ver los resultados
             </div>
         `;
@@ -277,7 +254,7 @@ document.getElementById('raceSelect')?.addEventListener('change', function() {
             <div class="spinner-border text-danger" role="status">
                 <span class="visually-hidden">Cargando...</span>
             </div>
-            <p class="mt-2">Cargando resultados...</p>
+            <p class="mt-2 small">Cargando resultados...</p>
         </div>
     `;
     
@@ -287,8 +264,8 @@ document.getElementById('raceSelect')?.addEventListener('change', function() {
         .then(results => {
             if (results.length === 0) {
                 resultsContainer.innerHTML = `
-                    <div class="text-center text-muted py-5">
-                        <i class="fas fa-exclamation-circle fa-3x mb-3"></i><br>
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-exclamation-circle fa-2x mb-2"></i><br>
                         No hay resultados para esta carrera
                     </div>
                 `;
@@ -296,15 +273,14 @@ document.getElementById('raceSelect')?.addEventListener('change', function() {
             }
             
             let html = `
-                <div class="table-responsive">
-                    <table class="table table-hover">
+                <div class="table-responsive scroll-container">
+                    <table class="table table-hover small">
                         <thead class="table-dark">
                             <tr>
-                                <th width="80">Pos</th>
+                                <th width="60">Pos</th>
                                 <th>Piloto</th>
-                                <th>Escudería</th>
-                                <th width="100">Puntos</th>
-                                <th width="120">Estado</th>
+                                <th width="70">Puntos</th>
+                                <th width="80">Estado</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -314,8 +290,8 @@ document.getElementById('raceSelect')?.addEventListener('change', function() {
                 const status = result.dnf ? 
                     '<span class="badge bg-danger">DNF</span>' : 
                     (result.fastest_lap ? 
-                        '<span class="badge bg-success">Finalizado ⚡</span>' : 
-                        '<span class="badge bg-secondary">Finalizado</span>');
+                        '<span class="badge bg-success">⚡</span>' : 
+                        '<span class="badge bg-secondary">Fin</span>');
                 
                 const rowClass = result.position <= 3 ? 
                     `table-${result.position === 1 ? 'warning' : result.position === 2 ? 'light' : 'info'}` : '';
@@ -324,7 +300,6 @@ document.getElementById('raceSelect')?.addEventListener('change', function() {
                     <tr class="${rowClass}">
                         <td><strong>${result.position}</strong></td>
                         <td>${result.driver_name}</td>
-                        <td>${result.team_name}</td>
                         <td><span class="badge bg-danger">${result.points}</span></td>
                         <td>${status}</td>
                     </tr>
@@ -351,7 +326,7 @@ document.getElementById('raceSelect')?.addEventListener('change', function() {
 
 // Activar pestañas de Bootstrap
 document.addEventListener('DOMContentLoaded', function() {
-    var triggerTabList = [].slice.call(document.querySelectorAll('#championshipTabs a'))
+    var triggerTabList = [].slice.call(document.querySelectorAll('#championshipTabs button'))
     triggerTabList.forEach(function (triggerEl) {
         var tabTrigger = new bootstrap.Tab(triggerEl)
         triggerEl.addEventListener('click', function (event) {
@@ -361,4 +336,19 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+
+<style>
+.nav-tabs .nav-link {
+    font-size: 0.9rem;
+    padding: 8px 12px;
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(220, 53, 69, 0.1);
+}
+
+.badge {
+    font-size: 0.8rem;
+}
+</style>
 {% endblock %}

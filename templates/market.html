@@ -3,157 +3,211 @@
 {% block title %}Mercado{% endblock %}
 
 {% block content %}
-<h1>Mercado de Transferencias</h1>
+<div class="container-fluid">
+    <h1 class="h3 mb-3">Mercado de Transferencias</h1>
 
-<!-- Información de límites y presupuesto -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-body py-3">
-                <div class="row text-center">
-                    <div class="col-md-3">
-                        <h4 class="text-primary">€{{ "{:,.0f}".format(current_user.money) }}</h4>
-                        <small class="text-muted">Presupuesto Actual</small>
-                    </div>
-                    <div class="col-md-3">
-                        <h4>{{ current_user.drivers|length }}/2</h4>
-                        <small class="text-muted">Pilotos</small>
-                    </div>
-                    <div class="col-md-3">
-                        <h4>{{ current_user.mechanics|length }}/4</h4>
-                        <small class="text-muted">Mecánicos</small>
-                    </div>
-                    <div class="col-md-3">
-                        <h4>{{ current_user.engineers|length }}/4</h4>
-                        <small class="text-muted">Ingenieros</small>
+    <!-- Información de límites y presupuesto -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body py-2">
+                    <div class="row text-center">
+                        <div class="col-6 col-md-3 mb-2">
+                            <h5 class="text-primary mb-1">€{{ "{:,.0f}".format(current_user.money) }}</h5>
+                            <small class="text-muted">Presupuesto</small>
+                        </div>
+                        <div class="col-6 col-md-3 mb-2">
+                            <h5 class="mb-1">{{ current_user.drivers|length }}/2</h5>
+                            <small class="text-muted">Pilotos</small>
+                        </div>
+                        <div class="col-6 col-md-3 mb-2">
+                            <h5 class="mb-1">{{ current_user.mechanics|length }}/4</h5>
+                            <small class="text-muted">Mecánicos</small>
+                        </div>
+                        <div class="col-6 col-md-3 mb-2">
+                            <h5 class="mb-1">{{ current_user.engineers|length }}/4</h5>
+                            <small class="text-muted">Ingenieros</small>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
-<div class="row">
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5>Pilotos Disponibles ({{ drivers|length }})</h5>
-            </div>
-            <div class="card-body">
-                {% for driver in drivers %}
-                <div class="market-item border rounded p-3 mb-2">
-                    <h6>{{ driver.name }}</h6>
-                    <p>
-                        Edad: {{ driver.age }} 
-                        {% if driver.age >= 35 %}<span class="badge bg-warning">Cerca de jubilar</span>{% endif %}
-                        {% if driver.age <= 25 %}<span class="badge bg-info">Joven</span>{% endif %}
-                        <br>
-                        Habilidad: {{ driver.skill }}<br>
-                        Experiencia: {{ driver.experience }}<br>
-                        Consistencia: {{ driver.consistency }}<br>
-                        <strong class="text-primary">Salario: €{{ "{:,.0f}".format(driver.salary) }}/carrera</strong>
-                    </p>
-                    <div class="value-indicator mb-2">
-                        {% set value_ratio = (driver.skill + driver.experience + driver.consistency) / driver.salary * 1000 %}
-                        <small class="text-muted">Relación valor: {{ "%.1f"|format(value_ratio) }}</small>
-                        <div class="progress" style="height: 5px;">
-                            <div class="progress-bar {% if value_ratio > 1.5 %}bg-success{% elif value_ratio > 1.0 %}bg-warning{% else %}bg-danger{% endif %}" 
-                                 style="width: {{ [value_ratio * 50, 100]|min }}%"></div>
+    <div class="row">
+        <!-- Pilotos -->
+        <div class="col-12 col-md-4 mb-3">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h6 class="mb-1">Pilotos Disponibles ({{ drivers|length }})</h6>
+                    <div class="filters">
+                        <div class="input-group input-group-sm mb-2">
+                            <input type="text" class="form-control driver-filter" placeholder="Buscar...">
+                        </div>
+                        <div>
+                            <select class="form-select form-select-sm driver-sort">
+                                <option value="value">Mejor valor</option>
+                                <option value="skill">Habilidad</option>
+                                <option value="experience">Experiencia</option>
+                                <option value="consistency">Consistencia</option>
+                                <option value="salary">Salario ↑</option>
+                                <option value="salary-desc">Salario ↓</option>
+                                <option value="age">Edad ↑</option>
+                                <option value="age-desc">Edad ↓</option>
+                            </select>
                         </div>
                     </div>
-                    <button class="btn btn-sm btn-primary buy-btn" 
-                            data-type="driver" 
-                            data-id="{{ driver.id }}"
-                            data-salary="{{ driver.salary }}"
-                            {% if current_user.drivers|length >= 2 %}disabled{% endif %}>
-                        Contratar - €{{ "{:,.0f}".format(driver.salary) }}
-                    </button>
                 </div>
-                {% else %}
-                <p class="text-muted">No hay pilotos disponibles</p>
-                {% endfor %}
+                <div class="card-body p-2" style="max-height: 500px; overflow-y: auto;">
+                    {% for driver in drivers %}
+                    <div class="market-item border rounded p-2 mb-2" data-skill="{{ driver.skill }}" data-experience="{{ driver.experience }}" data-consistency="{{ driver.consistency }}" data-salary="{{ driver.salary }}" data-age="{{ driver.age }}">
+                        <h6 class="mb-1">{{ driver.name }}</h6>
+                        <p class="mb-1 small">
+                            <strong>Edad:</strong> {{ driver.age }} 
+                            {% if driver.age >= 35 %}<span class="badge bg-warning">Veterano</span>{% endif %}
+                            {% if driver.age <= 25 %}<span class="badge bg-info">Joven</span>{% endif %}
+                            <br>
+                            <strong>Habilidad:</strong> {{ driver.skill }}<br>
+                            <strong>Experiencia:</strong> {{ driver.experience }}<br>
+                            <strong>Consistencia:</strong> {{ driver.consistency }}<br>
+                            <strong class="text-primary">Salario: €{{ "{:,.0f}".format(driver.salary) }}/carrera</strong>
+                        </p>
+                        <div class="value-indicator mb-2">
+                            {% set value_ratio = (driver.skill + driver.experience + driver.consistency) / driver.salary * 1000 %}
+                            <small class="text-muted">Valor: {{ "%.1f"|format(value_ratio) }}</small>
+                            <div class="progress" style="height: 4px;">
+                                <div class="progress-bar {% if value_ratio > 1.5 %}bg-success{% elif value_ratio > 1.0 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                     style="width: {{ [value_ratio * 50, 100]|min }}%"></div>
+                            </div>
+                        </div>
+                        <button class="btn btn-sm btn-primary w-100 buy-btn" 
+                                data-type="driver" 
+                                data-id="{{ driver.id }}"
+                                data-salary="{{ driver.salary }}"
+                                {% if current_user.drivers|length >= 2 %}disabled{% endif %}>
+                            Contratar - €{{ "{:,.0f}".format(driver.salary) }}
+                        </button>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center">No hay pilotos disponibles</p>
+                    {% endfor %}
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5>Mecánicos Disponibles ({{ mechanics|length }})</h5>
-            </div>
-            <div class="card-body">
-                {% for mechanic in mechanics %}
-                <div class="market-item border rounded p-3 mb-2">
-                    <h6>{{ mechanic.name }}</h6>
-                    <p>
-                        Edad: {{ mechanic.age }} 
-                        {% if mechanic.age >= 55 %}<span class="badge bg-warning">Cerca de jubilar</span>{% endif %}
-                        {% if mechanic.age <= 30 %}<span class="badge bg-info">Joven</span>{% endif %}
-                        <br>
-                        Habilidad Boxes: {{ mechanic.pit_stop_skill }}<br>
-                        Fiabilidad: {{ mechanic.reliability_skill }}<br>
-                        <strong class="text-primary">Salario: €{{ "{:,.0f}".format(mechanic.salary) }}/carrera</strong>
-                    </p>
-                    <div class="value-indicator mb-2">
-                        {% set value_ratio = (mechanic.pit_stop_skill + mechanic.reliability_skill) / mechanic.salary * 1000 %}
-                        <small class="text-muted">Relación valor: {{ "%.1f"|format(value_ratio) }}</small>
-                        <div class="progress" style="height: 5px;">
-                            <div class="progress-bar {% if value_ratio > 1.5 %}bg-success{% elif value_ratio > 1.0 %}bg-warning{% else %}bg-danger{% endif %}" 
-                                 style="width: {{ [value_ratio * 50, 100]|min }}%"></div>
+        <!-- Mecánicos -->
+        <div class="col-12 col-md-4 mb-3">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h6 class="mb-1">Mecánicos Disponibles ({{ mechanics|length }})</h6>
+                    <div class="filters">
+                        <div class="input-group input-group-sm mb-2">
+                            <input type="text" class="form-control mechanic-filter" placeholder="Buscar...">
+                        </div>
+                        <div>
+                            <select class="form-select form-select-sm mechanic-sort">
+                                <option value="value">Mejor valor</option>
+                                <option value="pit_stop">Habilidad Boxes</option>
+                                <option value="reliability">Fiabilidad</option>
+                                <option value="salary">Salario ↑</option>
+                                <option value="salary-desc">Salario ↓</option>
+                                <option value="age">Edad ↑</option>
+                                <option value="age-desc">Edad ↓</option>
+                            </select>
                         </div>
                     </div>
-                    <button class="btn btn-sm btn-primary buy-btn" 
-                            data-type="mechanic" 
-                            data-id="{{ mechanic.id }}"
-                            data-salary="{{ mechanic.salary }}"
-                            {% if current_user.mechanics|length >= 4 %}disabled{% endif %}>
-                        Contratar - €{{ "{:,.0f}".format(mechanic.salary) }}
-                    </button>
                 </div>
-                {% else %}
-                <p class="text-muted">No hay mecánicos disponibles</p>
-                {% endfor %}
+                <div class="card-body p-2" style="max-height: 500px; overflow-y: auto;">
+                    {% for mechanic in mechanics %}
+                    <div class="market-item border rounded p-2 mb-2" data-pit_stop="{{ mechanic.pit_stop_skill }}" data-reliability="{{ mechanic.reliability_skill }}" data-salary="{{ mechanic.salary }}" data-age="{{ mechanic.age }}">
+                        <h6 class="mb-1">{{ mechanic.name }}</h6>
+                        <p class="mb-1 small">
+                            <strong>Edad:</strong> {{ mechanic.age }} 
+                            {% if mechanic.age >= 55 %}<span class="badge bg-warning">Veterano</span>{% endif %}
+                            {% if mechanic.age <= 30 %}<span class="badge bg-info">Joven</span>{% endif %}
+                            <br>
+                            <strong>Boxes:</strong> {{ mechanic.pit_stop_skill }}<br>
+                            <strong>Fiabilidad:</strong> {{ mechanic.reliability_skill }}<br>
+                            <strong class="text-primary">Salario: €{{ "{:,.0f}".format(mechanic.salary) }}/carrera</strong>
+                        </p>
+                        <div class="value-indicator mb-2">
+                            {% set value_ratio = (mechanic.pit_stop_skill + mechanic.reliability_skill) / mechanic.salary * 1000 %}
+                            <small class="text-muted">Valor: {{ "%.1f"|format(value_ratio) }}</small>
+                            <div class="progress" style="height: 4px;">
+                                <div class="progress-bar {% if value_ratio > 1.5 %}bg-success{% elif value_ratio > 1.0 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                     style="width: {{ [value_ratio * 50, 100]|min }}%"></div>
+                            </div>
+                        </div>
+                        <button class="btn btn-sm btn-primary w-100 buy-btn" 
+                                data-type="mechanic" 
+                                data-id="{{ mechanic.id }}"
+                                data-salary="{{ mechanic.salary }}"
+                                {% if current_user.mechanics|length >= 4 %}disabled{% endif %}>
+                            Contratar - €{{ "{:,.0f}".format(mechanic.salary) }}
+                        </button>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center">No hay mecánicos disponibles</p>
+                    {% endfor %}
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5>Ingenieros Disponibles ({{ engineers|length }})</h5>
-            </div>
-            <div class="card-body">
-                {% for engineer in engineers %}
-                <div class="market-item border rounded p-3 mb-2">
-                    <h6>{{ engineer.name }}</h6>
-                    <p>
-                        Edad: {{ engineer.age }} 
-                        {% if engineer.age >= 65 %}<span class="badge bg-warning">Cerca de jubilar</span>{% endif %}
-                        {% if engineer.age <= 35 %}<span class="badge bg-info">Joven</span>{% endif %}
-                        <br>
-                        Innovación: {{ engineer.innovation }}<br>
-                        Velocidad Desarrollo: {{ engineer.development_speed }}<br>
-                        <strong class="text-primary">Salario: €{{ "{:,.0f}".format(engineer.salary) }}/carrera</strong>
-                    </p>
-                    <div class="value-indicator mb-2">
-                        {% set value_ratio = (engineer.innovation + engineer.development_speed) / engineer.salary * 1000 %}
-                        <small class="text-muted">Relación valor: {{ "%.1f"|format(value_ratio) }}</small>
-                        <div class="progress" style="height: 5px;">
-                            <div class="progress-bar {% if value_ratio > 1.5 %}bg-success{% elif value_ratio > 1.0 %}bg-warning{% else %}bg-danger{% endif %}" 
-                                 style="width: {{ [value_ratio * 50, 100]|min }}%"></div>
+        <!-- Ingenieros -->
+        <div class="col-12 col-md-4 mb-3">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h6 class="mb-1">Ingenieros Disponibles ({{ engineers|length }})</h6>
+                    <div class="filters">
+                        <div class="input-group input-group-sm mb-2">
+                            <input type="text" class="form-control engineer-filter" placeholder="Buscar...">
+                        </div>
+                        <div>
+                            <select class="form-select form-select-sm engineer-sort">
+                                <option value="value">Mejor valor</option>
+                                <option value="innovation">Innovación</option>
+                                <option value="development">Desarrollo</option>
+                                <option value="salary">Salario ↑</option>
+                                <option value="salary-desc">Salario ↓</option>
+                                <option value="age">Edad ↑</option>
+                                <option value="age-desc">Edad ↓</option>
+                            </select>
                         </div>
                     </div>
-                    <button class="btn btn-sm btn-primary buy-btn" 
-                            data-type="engineer" 
-                            data-id="{{ engineer.id }}"
-                            data-salary="{{ engineer.salary }}"
-                            {% if current_user.engineers|length >= 4 %}disabled{% endif %}>
-                        Contratar - €{{ "{:,.0f}".format(engineer.salary) }}
-                    </button>
                 </div>
-                {% else %}
-                <p class="text-muted">No hay ingenieros disponibles</p>
-                {% endfor %}
+                <div class="card-body p-2" style="max-height: 500px; overflow-y: auto;">
+                    {% for engineer in engineers %}
+                    <div class="market-item border rounded p-2 mb-2" data-innovation="{{ engineer.innovation }}" data-development="{{ engineer.development_speed }}" data-salary="{{ engineer.salary }}" data-age="{{ engineer.age }}">
+                        <h6 class="mb-1">{{ engineer.name }}</h6>
+                        <p class="mb-1 small">
+                            <strong>Edad:</strong> {{ engineer.age }} 
+                            {% if engineer.age >= 65 %}<span class="badge bg-warning">Veterano</span>{% endif %}
+                            {% if engineer.age <= 35 %}<span class="badge bg-info">Joven</span>{% endif %}
+                            <br>
+                            <strong>Innovación:</strong> {{ engineer.innovation }}<br>
+                            <strong>Desarrollo:</strong> {{ engineer.development_speed }}<br>
+                            <strong class="text-primary">Salario: €{{ "{:,.0f}".format(engineer.salary) }}/carrera</strong>
+                        </p>
+                        <div class="value-indicator mb-2">
+                            {% set value_ratio = (engineer.innovation + engineer.development_speed) / engineer.salary * 1000 %}
+                            <small class="text-muted">Valor: {{ "%.1f"|format(value_ratio) }}</small>
+                            <div class="progress" style="height: 4px;">
+                                <div class="progress-bar {% if value_ratio > 1.5 %}bg-success{% elif value_ratio > 1.0 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                     style="width: {{ [value_ratio * 50, 100]|min }}%"></div>
+                            </div>
+                        </div>
+                        <button class="btn btn-sm btn-primary w-100 buy-btn" 
+                                data-type="engineer" 
+                                data-id="{{ engineer.id }}"
+                                data-salary="{{ engineer.salary }}"
+                                {% if current_user.engineers|length >= 4 %}disabled{% endif %}>
+                            Contratar - €{{ "{:,.0f}".format(engineer.salary) }}
+                        </button>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center">No hay ingenieros disponibles</p>
+                    {% endfor %}
+                </div>
             </div>
         </div>
     </div>
@@ -161,20 +215,27 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.buy-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const type = this.dataset.type;
-            const id = this.dataset.id;
-            const salary = parseFloat(this.dataset.salary);
+    // Funcionalidad de compra - MÍNIMA INTERFERENCIA
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('buy-btn')) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const button = e.target;
+            const type = button.dataset.type;
+            const id = button.dataset.id;
+            const salary = parseFloat(button.dataset.salary);
             const userMoney = {{ current_user.money }};
             
-            // Verificar presupuesto antes de comprar
             if (salary > userMoney) {
                 alert('No tienes suficiente presupuesto para esta contratación');
                 return;
             }
             
             if (confirm(`¿Contratar por €${salary.toLocaleString()} por carrera?`)) {
+                button.disabled = true;
+                button.textContent = 'Procesando...';
+                
                 fetch(`/buy/${type}/${id}`)
                     .then(response => response.json())
                     .then(data => {
@@ -183,29 +244,174 @@ document.addEventListener('DOMContentLoaded', function() {
                             location.reload();
                         } else {
                             alert(data.message);
+                            button.disabled = false;
+                            button.textContent = `Contratar - €${salary.toLocaleString()}`;
                         }
                     })
                     .catch(error => {
                         console.error('Error:', error);
                         alert('Error en la transacción');
+                        button.disabled = false;
+                        button.textContent = `Contratar - €${salary.toLocaleString()}`;
                     });
             }
-        });
+        }
     });
+
+    // Funcionalidad de filtros y ordenación - SIMPLIFICADA
+    function setupFilters(filterInput, sortSelect, cardBody, type) {
+        // Filtro por nombre
+        filterInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const items = cardBody.querySelectorAll('.market-item');
+            
+            items.forEach(item => {
+                const name = item.querySelector('h6').textContent.toLowerCase();
+                item.style.display = name.includes(searchTerm) ? 'block' : 'none';
+            });
+        });
+        
+        // Ordenación
+        sortSelect.addEventListener('change', function() {
+            const sortBy = this.value;
+            const items = Array.from(cardBody.querySelectorAll('.market-item'));
+            
+            items.sort((a, b) => {
+                let aValue, bValue;
+                
+                const getNumericValue = (element, attribute) => parseFloat(element.dataset[attribute]) || 0;
+                
+                switch(sortBy) {
+                    case 'value':
+                        if (type === 'driver') {
+                            const aSkills = getNumericValue(a, 'skill') + getNumericValue(a, 'experience') + getNumericValue(a, 'consistency');
+                            const bSkills = getNumericValue(b, 'skill') + getNumericValue(b, 'experience') + getNumericValue(b, 'consistency');
+                            aValue = aSkills / getNumericValue(a, 'salary');
+                            bValue = bSkills / getNumericValue(b, 'salary');
+                        } else if (type === 'mechanic') {
+                            const aSkills = getNumericValue(a, 'pit_stop') + getNumericValue(a, 'reliability');
+                            const bSkills = getNumericValue(b, 'pit_stop') + getNumericValue(b, 'reliability');
+                            aValue = aSkills / getNumericValue(a, 'salary');
+                            bValue = bSkills / getNumericValue(b, 'salary');
+                        } else {
+                            const aSkills = getNumericValue(a, 'innovation') + getNumericValue(a, 'development');
+                            const bSkills = getNumericValue(b, 'innovation') + getNumericValue(b, 'development');
+                            aValue = aSkills / getNumericValue(a, 'salary');
+                            bValue = bSkills / getNumericValue(b, 'salary');
+                        }
+                        return bValue - aValue;
+                        
+                    case 'skill': case 'pit_stop': case 'innovation':
+                        aValue = getNumericValue(a, sortBy);
+                        bValue = getNumericValue(b, sortBy);
+                        return bValue - aValue;
+                        
+                    case 'experience': case 'consistency': case 'reliability': case 'development':
+                        aValue = getNumericValue(a, sortBy);
+                        bValue = getNumericValue(b, sortBy);
+                        return bValue - aValue;
+                        
+                    case 'salary':
+                        aValue = getNumericValue(a, 'salary');
+                        bValue = getNumericValue(b, 'salary');
+                        return aValue - bValue;
+                        
+                    case 'salary-desc':
+                        aValue = getNumericValue(a, 'salary');
+                        bValue = getNumericValue(b, 'salary');
+                        return bValue - aValue;
+                        
+                    case 'age':
+                        aValue = getNumericValue(a, 'age');
+                        bValue = getNumericValue(b, 'age');
+                        return aValue - bValue;
+                        
+                    case 'age-desc':
+                        aValue = getNumericValue(a, 'age');
+                        bValue = getNumericValue(b, 'age');
+                        return bValue - aValue;
+                        
+                    default:
+                        return 0;
+                }
+            });
+            
+            // Reorganizar sin modificar el DOM excesivamente
+            items.forEach(item => cardBody.appendChild(item));
+        });
+    }
+    
+    // Configurar filtros
+    setupFilters(
+        document.querySelector('.driver-filter'),
+        document.querySelector('.driver-sort'),
+        document.querySelector('.col-12.col-md-4:nth-child(1) .card-body'),
+        'driver'
+    );
+    
+    setupFilters(
+        document.querySelector('.mechanic-filter'),
+        document.querySelector('.mechanic-sort'),
+        document.querySelector('.col-12.col-md-4:nth-child(2) .card-body'),
+        'mechanic'
+    );
+    
+    setupFilters(
+        document.querySelector('.engineer-filter'),
+        document.querySelector('.engineer-sort'),
+        document.querySelector('.col-12.col-md-4:nth-child(3) .card-body'),
+        'engineer'
+    );
+
+    // ELIMINAR CUALQUIER INTERFERENCIA CON EL SCROLL
+    // No añadir event listeners a los contenedores de scroll
+    // Dejar que el navegador maneje el scroll naturalmente
+    
+    console.log('Market cargado - Scroll debería funcionar correctamente');
 });
 </script>
 
 <style>
-.value-indicator {
-    font-size: 0.8em;
-}
 .market-item {
     background-color: #f8f9fa;
     transition: transform 0.2s;
 }
 .market-item:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.filters {
+    background-color: #f8f9fa;
+    padding: 8px;
+    border-radius: 5px;
+}
+.value-indicator {
+    font-size: 0.8em;
+}
+
+/* SCROLL NATIVO - SIN MODIFICACIONES QUE INTERFIRAN */
+.card-body {
+    scrollbar-width: thin;
+    scrollbar-color: #c1c1c1 #f1f1f1;
+}
+
+/* Estilos opcionales para mejorar la apariencia del scrollbar */
+.card-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+.card-body::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.card-body::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+
+.card-body::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
 }
 </style>
 {% endblock %}

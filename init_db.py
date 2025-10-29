@@ -219,8 +219,8 @@ def init_database():
                 round_number=i + 1,
                 season_year=2025,
                 test_session=race_date + timedelta(days=2, hours=2),  # Viernes 10:00
-                qualifying_session=race_date + timedelta(days=3, hours=6),  # Sábado 14:00
-                race_session=race_date + timedelta(days=4, hours=5)  # Domingo 13:00
+                qualifying_session=race_date + timedelta(days=3, hours=5),  # Sábado 14:00
+                race_session=race_date + timedelta(days=4, hours=6)  # Domingo 13:00
             )
             db.session.add(race)
         

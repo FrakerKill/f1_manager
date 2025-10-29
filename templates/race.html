@@ -1,122 +1,398 @@
 {% extends "base.html" %}
 
-{% block title %}{{ race.circuit.name }}{% endblock %}
+{% block title %}{{ race.circuit.name }} - Detalles de la Carrera{% endblock %}
 
 {% block content %}
-<h1>Gran Premio de {{ race.circuit.country }}</h1>
-
-<div class="row">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-body">
-                <h4>{{ race.circuit.name }}</h4>
-                <p><strong>Vueltas:</strong> {{ race.circuit.laps }}</p>
-                <p><strong>País:</strong> {{ race.circuit.country }}</p>
-                <p><strong>Zona horaria:</strong> {{ race.circuit.timezone }}</p>
-                
-                <div class="mt-4">
-                    <h5>Sesiones:</h5>
-                    <ul class="list-group">
-                        <li class="list-group-item d-flex justify-content-between">
-                            <span>Tests:</span>
-                            <span data-race-time="{{ race.test_session.isoformat() }}">
-                                {{ race.test_session.strftime('%d/%m/%Y %H:%M') }}
-                            </span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between">
-                            <span>Clasificación:</span>
-                            <span data-race-time="{{ race.qualifying_session.isoformat() }}">
-                                {{ race.qualifying_session.strftime('%d/%m/%Y %H:%M') }}
-                            </span>
-                        </li>
-                        {% if race.sprint_session %}
-                        <li class="list-group-item d-flex justify-content-between">
-                            <span>Sprint:</span>
-                            <span data-race-time="{{ race.sprint_session.isoformat() }}">
-                                {{ race.sprint_session.strftime('%d/%m/%Y %H:%M') }}
-                            </span>
-                        </li>
-                        {% endif %}
-                        <li class="list-group-item d-flex justify-content-between">
-                            <span>Carrera:</span>
-                            <span data-race-time="{{ race.race_session.isoformat() }}">
-                                {{ race.race_session.strftime('%d/%m/%Y %H:%M') }}
-                            </span>
-                        </li>
-                    </ul>
+<div class="container-fluid">
+    <!-- Header de la Carrera -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-1">{{ race.circuit.name }}</h1>
+                    <p class="lead mb-0">
+                        <i class="fas fa-map-marker-alt"></i> {{ race.circuit.country }}
+                        • Ronda {{ race.round_number }} • Temporada {{ race.season_year }}
+                    </p>
+                </div>
+                <div class="text-end">
+                    <span class="badge bg-primary">Circuito: {{ race.circuit.laps }} vueltas</span>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5>Preparación</h5>
-            </div>
-            <div class="card-body">
-                <p>Prepara tu equipo para la carrera:</p>
-                
-                <div class="d-grid gap-2">
-                    {% if race.race_session <= now %}
-                    <a href="{{ url_for('live_race', race_id=race.id) }}" class="btn btn-success">
-                        Ver Carrera en Directo
-                    </a>
-                    {% else %}
-                    <button class="btn btn-outline-primary" disabled>
-                        Carrera Programada
-                    </button>
-                    <small class="text-muted">Disponible el día de la carrera</small>
-                    {% endif %}
-                    
-                    <a href="{{ url_for('test_session', race_id=race.id) }}" class="btn btn-outline-warning">
-                        Sesión de Tests
-                    </a>
-                    
-					<a href="{{ url_for('qualifying_session', race_id=race.id) }}" class="btn btn-outline-warning">
-                        Clasificación
-                    </a>
-					
-                    <a href="{{ url_for('race_strategy', race_id=race.id) }}" class="btn btn-outline-info">
-                        Planificar Estrategia
-                    </a>
-                    
-                    <a href="{{ url_for('upgrades') }}" class="btn btn-outline-secondary">
-                        Desarrollar Mejoras
-                    </a>
-                    
-                    <a href="{{ url_for('team_management') }}" class="btn btn-outline-secondary">
-                        Gestionar Equipo
-                    </a>
+    <!-- Acciones Rápidas -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="quick-actions">
+                <h4 class="mb-3"><i class="fas fa-rocket"></i> Acciones Rápidas</h4>
+                <div class="row">
+                    <div class="col-md-3 col-6 mb-2">
+                        <a href="{{ url_for('test_session', race_id=race.id) }}" 
+                           class="btn btn-quick-action w-100 py-2">
+                            <i class="fas fa-vial fa-lg mb-1"></i><br>
+                            <small>Preparar Tests</small>
+                        </a>
+                    </div>
+                    <div class="col-md-3 col-6 mb-2">
+                        <a href="{{ url_for('qualifying_session', race_id=race.id) }}" 
+                           class="btn btn-quick-action w-100 py-2">
+                            <i class="fas fa-stopwatch fa-lg mb-1"></i><br>
+                            <small>Preparar Clasificación</small>
+                        </a>
+                    </div>
+                    <div class="col-md-3 col-6 mb-2">
+                        <a href="{{ url_for('race_strategy', race_id=race.id) }}" 
+                           class="btn btn-quick-action w-100 py-2">
+                            <i class="fas fa-chess fa-lg mb-1"></i><br>
+                            <small>Estrategia Carrera</small>
+                        </a>
+                    </div>
+                    <div class="col-md-3 col-6 mb-2">
+                        <a href="{{ url_for('standings') }}" 
+                           class="btn btn-quick-action w-100 py-2">
+                            <i class="fas fa-trophy fa-lg mb-1"></i><br>
+                            <small>Clasificación</small>
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
+    </div>
 
-        <div class="card mt-3">
-            <div class="card-header">
-                <h5>Información de la Pista</h5>
+    <!-- Información del Circuito -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="circuit-info">
+                <h4 class="mb-3"><i class="fas fa-info-circle"></i> Información del Circuito</h4>
+                <div class="row">
+                    <div class="col-md-6">
+                        <p class="mb-2"><strong>Nombre:</strong> {{ race.circuit.name }}</p>
+                        <p class="mb-2"><strong>País:</strong> {{ race.circuit.country }}</p>
+                        <p class="mb-2"><strong>Vueltas:</strong> {{ race.circuit.laps }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p class="mb-2"><strong>Zona Horaria:</strong> {{ race.circuit.timezone }}</p>
+                        <p class="mb-2"><strong>Ronda:</strong> {{ race.round_number }}</p>
+                        <p class="mb-2"><strong>Temporada:</strong> {{ race.season_year }}</p>
+                    </div>
+                </div>
             </div>
-            <div class="card-body">
-                <p><strong>Longitud:</strong> {{ race.circuit.laps }} vueltas</p>
-                <p><strong>Dificultad:</strong> 
-                    {% if race.circuit.laps > 60 %}Alta{% elif race.circuit.laps > 50 %}Media{% else %}Baja{% endif %}
-                </p>
-                <p><strong>Requisitos:</strong> 
-                    {% if race.circuit.laps > 60 %}Alta fiabilidad{% elif race.circuit.laps > 50 %}Fiabilidad media{% else %}Velocidad pura{% endif %}
-                </p>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h5><i class="fas fa-clock"></i> Hora Local</h5>
+                    <div id="local-time" class="fs-4 fw-bold text-primary"></div>
+                    <small class="text-muted">{{ race.circuit.timezone }}</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sesiones de la Carrera -->
+    <div class="row">
+        <div class="col-12">
+            <h4 class="mb-3"><i class="fas fa-calendar-alt"></i> Sesiones de la Carrera</h4>
+            
+            <!-- Sesión de Tests -->
+            <div class="card session-card mb-3 {% if now > race.test_session %}session-completed{% else %}session-upcoming{% endif %}">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h5 class="card-title">
+                                <i class="fas fa-vial"></i> Sesión de Tests
+                            </h5>
+                            <p class="card-text mb-1">
+                                <i class="far fa-clock"></i> 
+                                <span class="session-time" data-session-time="{{ race.test_session.isoformat() }}">
+                                    {{ race.test_session.strftime('%d/%m/%Y %H:%M') }}
+                                </span>
+                            </p>
+                            {% set test_forecast = weather_forecasts|selectattr("session_type", "equalto", "test")|first %}
+                            {% if test_forecast %}
+                            <div class="weather-badge">
+                                {% if test_forecast.condition == 'dry' %}
+                                    <i class="fas fa-sun text-warning"></i> Seco
+                                {% elif test_forecast.condition == 'light_rain' %}
+                                    <i class="fas fa-cloud-rain text-info"></i> Lluvia Ligera
+                                {% elif test_forecast.condition == 'heavy_rain' %}
+                                    <i class="fas fa-cloud-showers-heavy text-primary"></i> Lluvia Intensa
+                                {% endif %}
+                                ({{ (test_forecast.probability * 100)|round|int }}%)
+                            </div>
+                            {% endif %}
+                            {% if race.test_session > now %}
+                                <span class="badge bg-warning">Próximamente</span>
+                            {% else %}
+                                <span class="badge bg-success">Realizado</span>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-4 text-end">
+                            {% if race.test_session <= now %}
+                                <a href="{{ url_for('test_session', race_id=race.id) }}" 
+                                   class="btn btn-outline-primary btn-sm">
+                                    <i class="fas fa-chart-line"></i> Ver Tests
+                                </a>
+                            {% else %}
+                                <button class="btn btn-outline-secondary btn-sm" disabled>
+                                    Próximamente
+                                </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Clasificación -->
+            <div class="card session-card mb-3 {% if now > race.qualifying_session %}session-completed{% elif (race.qualifying_session - now).total_seconds() < 3600 %}session-active{% else %}session-upcoming{% endif %}">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h5 class="card-title">
+                                <i class="fas fa-stopwatch"></i> Sesión de Clasificación
+                            </h5>
+                            <p class="card-text mb-1">
+                                <i class="far fa-clock"></i> 
+                                <span class="session-time" data-session-time="{{ race.qualifying_session.isoformat() }}">
+                                    {{ race.qualifying_session.strftime('%d/%m/%Y %H:%M') }}
+                                </span>
+                            </p>
+                            {% set qualifying_forecast = weather_forecasts|selectattr("session_type", "equalto", "qualifying")|first %}
+                            {% if qualifying_forecast %}
+                            <div class="weather-badge">
+                                {% if qualifying_forecast.condition == 'dry' %}
+                                    <i class="fas fa-sun text-warning"></i> Seco
+                                {% elif qualifying_forecast.condition == 'light_rain' %}
+                                    <i class="fas fa-cloud-rain text-info"></i> Lluvia Ligera
+                                {% elif qualifying_forecast.condition == 'heavy_rain' %}
+                                    <i class="fas fa-cloud-showers-heavy text-primary"></i> Lluvia Intensa
+                                {% endif %}
+                                ({{ (qualifying_forecast.probability * 100)|round|int }}%)
+                            </div>
+                            {% endif %}
+                            {% if race.qualifying_session > now %}
+                                {% if (race.qualifying_session - now).total_seconds() < 3600 %}
+                                    <span class="badge bg-warning">¡Próximamente!</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Programado</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="badge bg-success">Realizado</span>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-4 text-end">
+                            {% if has_qualifying_events %}
+                                <a href="{{ url_for('live_session', race_id=race.id, session_type='qualifying') }}" 
+                                   class="btn btn-primary btn-sm">
+                                    <i class="fas fa-tv"></i> Ver Clasificación
+                                </a>
+                            {% else %}
+                                <button class="btn btn-success btn-sm" onclick="simulateQualifying({{ race.id }})">
+                                    <i class="fas fa-play"></i> Simular Clasificación
+                                </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Carrera Principal -->
+            <div class="card session-card {% if now > race.race_session %}session-completed{% elif (race.race_session - now).total_seconds() < 3600 %}session-active{% else %}session-upcoming{% endif %}">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h5 class="card-title">
+                                <i class="fas fa-flag-checkered"></i> Carrera Principal
+                            </h5>
+                            <p class="card-text mb-1">
+                                <i class="far fa-clock"></i> 
+                                <span class="session-time" data-session-time="{{ race.race_session.isoformat() }}">
+                                    {{ race.race_session.strftime('%d/%m/%Y %H:%M') }}
+                                </span>
+                            </p>
+                            {% set race_forecast = weather_forecasts|selectattr("session_type", "equalto", "race")|first %}
+                            {% if race_forecast %}
+                            <div class="weather-badge">
+                                {% if race_forecast.condition == 'dry' %}
+                                    <i class="fas fa-sun text-warning"></i> Seco
+                                {% elif race_forecast.condition == 'light_rain' %}
+                                    <i class="fas fa-cloud-rain text-info"></i> Lluvia Ligera
+                                {% elif race_forecast.condition == 'heavy_rain' %}
+                                    <i class="fas fa-cloud-showers-heavy text-primary"></i> Lluvia Intensa
+                                {% endif %}
+                                ({{ (race_forecast.probability * 100)|round|int }}%)
+                            </div>
+                            {% endif %}
+                            {% if race.race_session > now %}
+                                {% if (race.race_session - now).total_seconds() < 3600 %}
+                                    <span class="badge bg-warning">¡Próximamente!</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Programado</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="badge bg-success">Realizado</span>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-4 text-end">
+                            {% if has_race_events %}
+                                <a href="{{ url_for('live_session', race_id=race.id, session_type='race') }}" 
+                                   class="btn btn-primary btn-sm">
+                                    <i class="fas fa-tv"></i> Ver Carrera
+                                </a>
+                            {% else %}
+                                <button class="btn btn-success btn-sm" onclick="simulateRace({{ race.id }})">
+                                    <i class="fas fa-play"></i> Simular Carrera
+                                </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Actualizar horas locales
-    document.querySelectorAll('[data-race-time]').forEach(element => {
-        const utcTime = element.getAttribute('data-race-time');
-        const localTime = new Date(utcTime).toLocaleString('es-ES');
-        element.textContent = localTime;
+    // Actualizar hora local del circuito
+    function updateLocalTime() {
+        const timezone = "{{ race.circuit.timezone }}";
+        const options = {
+            timeZone: timezone,
+            hour12: false,
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        };
+        
+        try {
+            const formatter = new Intl.DateTimeFormat('es-ES', options);
+            const localTime = formatter.format(new Date());
+            document.getElementById('local-time').textContent = localTime;
+        } catch (e) {
+            document.getElementById('local-time').textContent = 'Hora no disponible';
+        }
+    }
+    
+    // Convertir todas las horas UTC a hora local - IGUAL QUE EN CALENDAR.HTML
+    function convertTimesToLocal() {
+        // Convertir horas de sesiones
+        document.querySelectorAll('[data-session-time]').forEach(element => {
+            const utcTime = element.getAttribute('data-session-time');
+            const localTime = new Date(utcTime).toLocaleString('es-ES');
+            element.textContent = localTime;
+        });
+    }
+    
+    // Inicializar
+    document.addEventListener('DOMContentLoaded', function() {
+        updateLocalTime();
+        setInterval(updateLocalTime, 1000);
+        convertTimesToLocal(); // Aplicar conversión de horas igual que en calendar.html
+        
+        // Mostrar notificaciones de estado de sesiones
+        const now = new Date();
+        const raceTime = new Date("{{ race.race_session.isoformat() }}");
+        const timeDiff = raceTime - now;
+        
+        if (timeDiff > 0 && timeDiff < 3600000) { // Menos de 1 hora
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-warning alert-dismissible fade show';
+            alert.innerHTML = `
+                <i class="fas fa-exclamation-triangle"></i>
+                <strong>¡Atención!</strong> La carrera comienza en menos de 1 hora.
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.querySelector('.container-fluid').prepend(alert);
+        }
     });
-});
+
+    // Función para simular clasificación
+    function simulateQualifying(raceId) {
+        if (confirm('¿Simular sesión de clasificación? Esto generará resultados de Q1, Q2 y Q3.')) {
+            fetch(`/api/simulate_qualifying_live/${raceId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                        window.location.href = `/live_session/${raceId}/qualifying`;
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    alert('Error al simular clasificación: ' + error);
+                });
+        }
+    }
+
+    // Función para simular carrera
+    function simulateRace(raceId) {
+        if (confirm('¿Simular carrera principal? Esto puede tomar unos momentos.')) {
+            fetch(`/api/simulate_race_live/${raceId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                        window.location.href = `/live_session/${raceId}/race`;
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    alert('Error al simular carrera: ' + error);
+                });
+        }
+    }
 </script>
+
+<style>
+    .session-card {
+        transition: transform 0.2s;
+    }
+    .session-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .session-active {
+        border-left: 4px solid #28a745;
+    }
+    .session-upcoming {
+        border-left: 4px solid #ffc107;
+    }
+    .session-completed {
+        border-left: 4px solid #6c757d;
+    }
+    .circuit-info {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 1.5rem;
+    }
+    .quick-actions {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 1.5rem;
+    }
+    .btn-quick-action {
+        background: rgba(255,255,255,0.2);
+        border: 2px solid rgba(255,255,255,0.3);
+        color: white;
+        transition: all 0.3s;
+    }
+    .btn-quick-action:hover {
+        background: rgba(255,255,255,0.3);
+        border-color: rgba(255,255,255,0.5);
+        transform: translateY(-2px);
+    }
+    .weather-badge {
+        font-size: 0.85rem;
+        background: rgba(0,0,0,0.1);
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.25rem;
+        display: inline-block;
+        margin-top: 0.25rem;
+    }
+</style>
 {% endblock %}

@@ -3,367 +3,365 @@
 {% block title %}Clasificación - {{ race.circuit.name }}{% endblock %}
 
 {% block content %}
-<h1>🏁 Sesión de Clasificación - {{ race.circuit.name }}</h1>
+<div class="container-fluid">
+    <h1 class="h3 mb-3">🏁 Clasificación - {{ race.circuit.name }}</h1>
 
-<div class="row">
-    <div class="col-md-8">
-        <!-- Información Meteorológica -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5>🌤️ Pronóstico Meteorológico para la Clasificación</h5>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    {% if qualifying_weather %}
-                    <div class="col-md-4 text-center">
-                        <h4>
-                            {% if qualifying_weather.condition == 'dry' %}🌤️
-                            {% elif qualifying_weather.condition == 'light_rain' %}🌧️
-                            {% else %}⛈️{% endif %}
-                        </h4>
-                        <h5>
-                            {% if qualifying_weather.condition == 'dry' %}Seco
-                            {% elif qualifying_weather.condition == 'light_rain' %}Lluvia Ligera
-                            {% else %}Lluvia Intensa{% endif %}
-                        </h5>
-                        <p class="text-muted">{{ (qualifying_weather.probability * 100)|int }}% de probabilidad</p>
-                    </div>
-                    <div class="col-md-8">
-                        <h6>Impacto en la Clasificación:</h6>
-                        <div id="qualifyingImpact">
-                            {% if qualifying_weather.condition == 'dry' %}
-                            <div class="alert alert-success">
-                                <strong>Condiciones óptimas:</strong> Podrás usar neumáticos de seco para máximo rendimiento.
-                            </div>
-                            {% elif qualifying_weather.condition == 'light_rain' %}
-                            <div class="alert alert-info">
-                                <strong>Lluvia ligera:</strong> Neumáticos de lluvia recomendados. La pista puede cambiar rápidamente.
-                            </div>
-                            {% else %}
-                            <div class="alert alert-warning">
-                                <strong>Lluvia intensa:</strong> Neumáticos de lluvia extrema obligatorios. Sesión posiblemente interrumpida.
-                            </div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% else %}
-                    <div class="col-12">
-                        <p class="text-muted">Pronóstico no disponible</p>
-                    </div>
-                    {% endif %}
+    <div class="row">
+        <div class="col-12 col-lg-8 mb-3">
+            <!-- Información Meteorológica -->
+            <div class="card mb-3">
+                <div class="card-header py-2">
+                    <h6 class="mb-0">🌤️ Pronóstico para Clasificación</h6>
                 </div>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="card-header">
-                <h5>Selección de Neumáticos para Clasificación</h5>
-            </div>
-            <div class="card-body">
-                <form id="qualifyingForm">
-                    <div class="row mb-4">
-                        <div class="col-md-6">
-                            <label class="form-label">Piloto</label>
-                            <select class="form-select" id="driverSelect" required>
-                                <option value="">Selecciona un piloto</option>
-                                {% if team and team.drivers %}
-                                    {% for driver in team.drivers %}
-                                    <option value="{{ driver.id }}" 
-                                            data-skill="{{ driver.skill }}" 
-                                            data-consistency="{{ driver.consistency }}"
-                                            data-experience="{{ driver.experience }}">
-                                        {{ driver.name }} (Habilidad: {{ driver.skill }})
-                                    </option>
-                                    {% endfor %}
+                <div class="card-body">
+                    <div class="row">
+                        {% if qualifying_weather %}
+                        <div class="col-12 col-md-4 text-center mb-2">
+                            <h4 class="mb-1">
+                                {% if qualifying_weather.condition == 'dry' %}🌤️
+                                {% elif qualifying_weather.condition == 'light_rain' %}🌧️
+                                {% else %}⛈️{% endif %}
+                            </h4>
+                            <h6 class="mb-1">
+                                {% if qualifying_weather.condition == 'dry' %}Seco
+                                {% elif qualifying_weather.condition == 'light_rain' %}Lluvia Ligera
+                                {% else %}Lluvia Intensa{% endif %}
+                            </h6>
+                            <p class="text-muted small">{{ (qualifying_weather.probability * 100)|int }}% probabilidad</p>
+                        </div>
+                        <div class="col-12 col-md-8">
+                            <h6 class="small">Impacto en la Clasificación:</h6>
+                            <div id="qualifyingImpact">
+                                {% if qualifying_weather.condition == 'dry' %}
+                                <div class="alert alert-success py-2">
+                                    <small><strong>Condiciones óptimas:</strong> Neumáticos de seco para máximo rendimiento.</small>
+                                </div>
+                                {% elif qualifying_weather.condition == 'light_rain' %}
+                                <div class="alert alert-info py-2">
+                                    <small><strong>Lluvia ligera:</strong> Neumáticos de lluvia recomendados.</small>
+                                </div>
                                 {% else %}
-                                    <option value="" disabled>No hay pilotos disponibles</option>
+                                <div class="alert alert-warning py-2">
+                                    <small><strong>Lluvia intensa:</strong> Neumáticos de lluvia extrema obligatorios.</small>
+                                </div>
                                 {% endif %}
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Estrategia de Clasificación</label>
-                            <select class="form-select" id="strategySelect">
-                                <option value="aggressive">Agresiva - Máximo rendimiento</option>
-                                <option value="balanced" selected>Equilibrada - Rendimiento constante</option>
-                                <option value="conservative">Conservadora - Minimizar riesgos</option>
-                                <option value="weather">Adaptativa - Según condiciones</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <!-- Selección de Neumáticos -->
-                    <div class="card mb-4">
-                        <div class="card-header bg-light">
-                            <h6 class="mb-0">🧠 Elección de Neumáticos</h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="alert alert-info">
-                                <small><strong>💡 Información:</strong> La clasificación tiene 3 partes (Q1, Q2, Q3). Cada piloto tiene aproximadamente 10 vueltas en total.</small>
-                            </div>
-
-                            <div class="row">
-                                <!-- Neumáticos para Condiciones Secas -->
-                                <div class="col-md-6">
-                                    <h6>Neumáticos de Seco</h6>
-                                    <div class="btn-group-vertical w-100" role="group">
-                                        <button type="button" class="btn btn-outline-danger tyre-btn" data-tyre="soft">
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <span>🟡 Blando (Soft)</span>
-                                                <span class="badge bg-danger">Máx. Velocidad</span>
-                                            </div>
-                                            <small class="d-block text-muted">1-2 vueltas máximas • Ideal para Q3</small>
-                                        </button>
-                                        
-                                        <button type="button" class="btn btn-outline-warning tyre-btn" data-tyre="medium">
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <span>⚪ Medio (Medium)</span>
-                                                <span class="badge bg-warning">Equilibrado</span>
-                                            </div>
-                                            <small class="d-block text-muted">2-3 vueltas • Bueno para Q1/Q2</small>
-                                        </button>
-                                        
-                                        <button type="button" class="btn btn-outline-secondary tyre-btn" data-tyre="hard">
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <span>🔴 Duro (Hard)</span>
-                                                <span class="badge bg-secondary">Duradero</span>
-                                            </div>
-                                            <small class="d-block text-muted">3+ vueltas • Estrategia conservadora</small>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <!-- Neumáticos para Lluvia -->
-                                <div class="col-md-6">
-                                    <h6>Neumáticos de Lluvia</h6>
-                                    <div class="btn-group-vertical w-100" role="group">
-                                        <button type="button" class="btn btn-outline-info tyre-btn" data-tyre="wet">
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <span>🌧️ Lluvia (Wet)</span>
-                                                <span class="badge bg-info">Lluvia Ligera</span>
-                                            </div>
-                                            <small class="d-block text-muted">Lluvia moderada • Buen agarre</small>
-                                        </button>
-                                        
-                                        <button type="button" class="btn btn-outline-primary tyre-btn" data-tyre="extreme_wet">
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <span>⛈️ Lluvia Extrema</span>
-                                                <span class="badge bg-primary">Lluvia Intensa</span>
-                                            </div>
-                                            <small class="d-block text-muted">Lluvia fuerte • Máximo agarre</small>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Selección Actual -->
-                            <div class="mt-4 p-3 border rounded bg-light" id="currentSelection">
-                                <div class="text-center">
-                                    <small class="text-muted">Selección actual:</small><br>
-                                    <strong id="currentTyreDisplay" class="fs-5">No seleccionado</strong>
-                                    <div id="tyreRecommendation" class="mt-2"></div>
-                                </div>
                             </div>
                         </div>
-                    </div>
-
-                    <!-- Información del Piloto Seleccionado -->
-                    <div class="card mb-4" id="driverInfo" style="display: none;">
-                        <div class="card-header bg-light">
-                            <h6 class="mb-0">📊 Estadísticas del Piloto</h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="row" id="driverStats">
-                                <!-- Las estadísticas se cargarán aquí -->
-                            </div>
-                        </div>
-                    </div>
-
-                    <button type="submit" class="btn btn-success w-100" id="confirmSelection">
-                        🏁 Confirmar Selección para Clasificación
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-4">
-        <!-- Información de la Clasificación -->
-        <div class="card">
-            <div class="card-header">
-                <h5>Información de la Clasificación</h5>
-            </div>
-            <div class="card-body">
-                <p><strong>Circuito:</strong> {{ race.circuit.name }}</p>
-                <p><strong>Formato:</strong> Q1, Q2, Q3</p>
-                <p><strong>Vueltas aprox. por piloto:</strong> 10</p>
-                <p><strong>Hora de la sesión:</strong> 
-                    <span data-race-time="{{ race.qualifying_session.isoformat() if race.qualifying_session else '' }}">
-                        {% if race.qualifying_session %}
-                            {{ race.qualifying_session.strftime('%d/%m/%Y %H:%M') }}
                         {% else %}
-                            Por definir
+                        <div class="col-12">
+                            <p class="text-muted small">Pronóstico no disponible</p>
+                        </div>
                         {% endif %}
-                    </span>
-                </p>
-                
-                <div class="mt-3">
-                    <h6>Estructura:</h6>
-                    <ul class="small">
-                        <li><strong>Q1:</strong> 18 minutos - 15 pilotos pasan</li>
-                        <li><strong>Q2:</strong> 15 minutos - 10 pilotos pasan</li>
-                        <li><strong>Q3:</strong> 12 minutos - Pole position</li>
-                    </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header py-2">
+                    <h6 class="mb-0">Selección de Neumáticos</h6>
+                </div>
+                <div class="card-body">
+                    <form id="qualifyingForm">
+                        <div class="row mb-3">
+                            <div class="col-12 col-md-6 mb-2">
+                                <label class="form-label small">Piloto</label>
+                                <select class="form-select" id="driverSelect" required>
+                                    <option value="">Selecciona un piloto</option>
+                                    {% if team and team.drivers %}
+                                        {% for driver in team.drivers %}
+                                        <option value="{{ driver.id }}" 
+                                                data-skill="{{ driver.skill }}" 
+                                                data-consistency="{{ driver.consistency }}"
+                                                data-experience="{{ driver.experience }}">
+                                            {{ driver.name }} (Habilidad: {{ driver.skill }})
+                                        </option>
+                                        {% endfor %}
+                                    {% else %}
+                                        <option value="" disabled>No hay pilotos disponibles</option>
+                                    {% endif %}
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-6 mb-2">
+                                <label class="form-label small">Estrategia</label>
+                                <select class="form-select" id="strategySelect">
+                                    <option value="aggressive">Agresiva</option>
+                                    <option value="balanced" selected>Equilibrada</option>
+                                    <option value="conservative">Conservadora</option>
+                                    <option value="weather">Adaptativa</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Selección de Neumáticos -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-light py-2">
+                                <h6 class="mb-0 small">🧠 Elección de Neumáticos</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="alert alert-info py-2 mb-2">
+                                    <small><strong>💡 Información:</strong> La clasificación tiene 3 partes (Q1, Q2, Q3). Cada piloto tiene aproximadamente 10 vueltas en total.</small>
+                                </div>
+
+                                <div class="row">
+                                    <!-- Neumáticos para Condiciones Secas -->
+                                    <div class="col-12 col-md-6 mb-2">
+                                        <h6 class="small">Neumáticos de Seco</h6>
+                                        <div class="btn-group-vertical w-100" role="group">
+                                            <button type="button" class="btn btn-outline-danger tyre-btn text-start py-2" data-tyre="soft">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <span>🟡 Blando (Soft)</span>
+                                                    <span class="badge bg-danger small">Máx. Velocidad</span>
+                                                </div>
+                                                <small class="d-block text-muted">1-2 vueltas máximas</small>
+                                            </button>
+                                            
+                                            <button type="button" class="btn btn-outline-warning tyre-btn text-start py-2" data-tyre="medium">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <span>⚪ Medio (Medium)</span>
+                                                    <span class="badge bg-warning small">Equilibrado</span>
+                                                </div>
+                                                <small class="d-block text-muted">2-3 vueltas</small>
+                                            </button>
+                                            
+                                            <button type="button" class="btn btn-outline-secondary tyre-btn text-start py-2" data-tyre="hard">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <span>🔴 Duro (Hard)</span>
+                                                    <span class="badge bg-secondary small">Duradero</span>
+                                                </div>
+                                                <small class="d-block text-muted">3+ vueltas</small>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Neumáticos para Lluvia -->
+                                    <div class="col-12 col-md-6 mb-2">
+                                        <h6 class="small">Neumáticos de Lluvia</h6>
+                                        <div class="btn-group-vertical w-100" role="group">
+                                            <button type="button" class="btn btn-outline-info tyre-btn text-start py-2" data-tyre="wet">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <span>🌧️ Lluvia (Wet)</span>
+                                                    <span class="badge bg-info small">Lluvia Ligera</span>
+                                                </div>
+                                                <small class="d-block text-muted">Lluvia moderada</small>
+                                            </button>
+                                            
+                                            <button type="button" class="btn btn-outline-primary tyre-btn text-start py-2" data-tyre="extreme_wet">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <span>⛈️ Lluvia Extrema</span>
+                                                    <span class="badge bg-primary small">Lluvia Intensa</span>
+                                                </div>
+                                                <small class="d-block text-muted">Lluvia fuerte</small>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Selección Actual -->
+                                <div class="mt-3 p-2 border rounded bg-light" id="currentSelection">
+                                    <div class="text-center">
+                                        <small class="text-muted">Selección actual:</small><br>
+                                        <strong id="currentTyreDisplay" class="fs-6">No seleccionado</strong>
+                                        <div id="tyreRecommendation" class="mt-1"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Información del Piloto Seleccionado -->
+                        <div class="card mb-3" id="driverInfo" style="display: none;">
+                            <div class="card-header bg-light py-2">
+                                <h6 class="mb-0 small">📊 Estadísticas del Piloto</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row" id="driverStats">
+                                    <!-- Las estadísticas se cargarán aquí -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-success w-100 py-2" id="confirmSelection">
+                            🏁 Confirmar Selección
+                        </button>
+                    </form>
                 </div>
             </div>
         </div>
 
-        <!-- Estrategias Recomendadas -->
-        <div class="card mt-3">
-            <div class="card-header bg-info text-white">
-                <h6 class="mb-0">🎯 Estrategias Recomendadas</h6>
-            </div>
-            <div class="card-body">
-                {% if qualifying_weather %}
-                    {% if qualifying_weather.condition == 'dry' %}
-                    <div class="strategy-item mb-3">
-                        <strong>Condiciones Secas:</strong>
-                        <ul class="small mb-0 mt-2">
-                            <li><strong>Agresiva:</strong> Soft en Q1, Soft en Q2, Soft nuevo en Q3</li>
-                            <li><strong>Equilibrada:</strong> Medium en Q1/Q2, Soft nuevo en Q3</li>
-                            <li><strong>Conservadora:</strong> Hard en Q1, Medium en Q2/Q3</li>
-                        </ul>
-                    </div>
-                    {% elif qualifying_weather.condition == 'light_rain' %}
-                    <div class="strategy-item mb-3">
-                        <strong>Lluvia Ligera:</strong>
-                        <ul class="small mb-0 mt-2">
-                            <li>Neumáticos de lluvia obligatorios</li>
-                            <li>Intentar hacer el tiempo al final de la sesión</li>
-                            <li>La pista puede mejorar/empeorar rápidamente</li>
-                        </ul>
-                    </div>
-                    {% else %}
-                    <div class="strategy-item mb-3">
-                        <strong>Lluvia Intensa:</strong>
-                        <ul class="small mb-0 mt-2">
-                            <li>Neumáticos de lluvia extrema obligatorios</li>
-                            <li>Sesiones posiblemente retrasadas/interrumpidas</li>
-                            <li>Enfocarse en no cometer errores</li>
-                        </ul>
-                    </div>
-                    {% endif %}
-                {% else %}
-                    <p class="text-muted mb-0">Esperando pronóstico meteorológico...</p>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Estado de Preparación -->
-        <div class="card mt-3">
-            <div class="card-header bg-secondary text-white">
-                <h6 class="mb-0">📋 Estado de Preparación</h6>
-            </div>
-            <div class="card-body">
-                <div id="preparationStatus">
-                    {% for driver in team.drivers %}
-                        {# Buscar la elección usando un diccionario #}
-                        {% set driver_choices_dict = {} %}
-                        {% for choice in existing_choices %}
-                            {% if driver_choices_dict.update({choice.driver_id: choice}) %}{% endif %}
-                        {% endfor %}
-                        
-                        {% set driver_choice = driver_choices_dict.get(driver.id) %}
-                        
-                        <div class="driver-status border-bottom pb-2 mb-2">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <strong>{{ driver.name }}</strong>
-                                <span class="badge bg-{% if driver_choice %}success{% else %}warning{% endif %}">
-                                    {% if driver_choice %}✅ Listo{% else %}⏳ Pendiente{% endif %}
-                                </span>
-                            </div>
-                            {% if driver_choice %}
-                            <small class="text-muted">
-                                Neumático: 
-                                <span class="badge bg-{{ get_tyre_badge_color(driver_choice.tyre_choice) }}">
-                                    {{ get_tyre_display_name(driver_choice.tyre_choice) }}
-                                </span>
-                                <button class="btn btn-sm btn-outline-danger ms-2" onclick="clearDriverChoice({{ driver.id }})">
-                                    🗑️ Eliminar
-                                </button>
-                            </small>
+        <div class="col-12 col-lg-4">
+            <!-- Información de la Clasificación -->
+            <div class="card mb-3">
+                <div class="card-header py-2">
+                    <h6 class="mb-0">Información de la Clasificación</h6>
+                </div>
+                <div class="card-body">
+                    <p class="small mb-1"><strong>Circuito:</strong> {{ race.circuit.name }}</p>
+                    <p class="small mb-1"><strong>Formato:</strong> Q1, Q2, Q3</p>
+                    <p class="small mb-1"><strong>Vueltas aprox.:</strong> 10 por piloto</p>
+                    <p class="small mb-1"><strong>Hora:</strong> 
+                        <span data-race-time="{{ race.qualifying_session.isoformat() if race.qualifying_session else '' }}">
+                            {% if race.qualifying_session %}
+                                {{ race.qualifying_session.strftime('%d/%m %H:%M') }}
                             {% else %}
-                            <small class="text-muted">Sin neumático seleccionado</small>
+                                Por definir
                             {% endif %}
+                        </span>
+                    </p>
+                    
+                    <div class="mt-2">
+                        <h6 class="small">Estructura:</h6>
+                        <ul class="small mb-0">
+                            <li><strong>Q1:</strong> 18 min - 15 pasan</li>
+                            <li><strong>Q2:</strong> 15 min - 10 pasan</li>
+                            <li><strong>Q3:</strong> 12 min - Pole</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Estrategias Recomendadas -->
+            <div class="card mb-3">
+                <div class="card-header bg-info text-white py-2">
+                    <h6 class="mb-0 small">🎯 Estrategias Recomendadas</h6>
+                </div>
+                <div class="card-body">
+                    {% if qualifying_weather %}
+                        {% if qualifying_weather.condition == 'dry' %}
+                        <div class="strategy-item mb-2">
+                            <strong class="small">Condiciones Secas:</strong>
+                            <ul class="small mb-0 mt-1">
+                                <li><strong>Agresiva:</strong> Soft en Q1, Q2, Soft nuevo en Q3</li>
+                                <li><strong>Equilibrada:</strong> Medium en Q1/Q2, Soft en Q3</li>
+                            </ul>
                         </div>
-                    {% endfor %}
-                </div>
-
-                {% if is_fully_prepared %}
-                <div class="alert alert-success mt-3">
-                    <small>✅ Tu equipo está completamente preparado para la clasificación</small>
-                </div>
-                {% else %}
-                <div class="alert alert-warning mt-3">
-                    <small>⚠️ Faltan selecciones para {{ team.drivers|length - existing_choices|length }} piloto(s)</small>
-                </div>
-                {% endif %}
-
-                <!-- Botones de acción -->
-                <div class="d-grid gap-2">
-                    {% if race.qualifying_session %}
-                        {% if race.qualifying_session <= now %}
-                        <button class="btn btn-success" onclick="simulateQualifying()">
-                            🏁 Simular Clasificación
-                        </button>
+                        {% elif qualifying_weather.condition == 'light_rain' %}
+                        <div class="strategy-item mb-2">
+                            <strong class="small">Lluvia Ligera:</strong>
+                            <ul class="small mb-0 mt-1">
+                                <li>Neumáticos de lluvia obligatorios</li>
+                                <li>Intentar tiempo al final de sesión</li>
+                            </ul>
+                        </div>
                         {% else %}
-                        <button class="btn btn-outline-secondary" disabled>
-                            ⏳ Clasificación Programada
-                        </button>
-                        <small class="text-muted d-block text-center mt-1">
-                            Disponible: {{ race.qualifying_session.strftime('%d/%m/%Y %H:%M') }}
-                        </small>
+                        <div class="strategy-item mb-2">
+                            <strong class="small">Lluvia Intensa:</strong>
+                            <ul class="small mb-0 mt-1">
+                                <li>Lluvia extrema obligatorio</li>
+                                <li>Sesiones posiblemente retrasadas</li>
+                            </ul>
+                        </div>
                         {% endif %}
                     {% else %}
-                        <button class="btn btn-outline-secondary" disabled>
-                            ⏳ Sesión no programada
+                        <p class="text-muted small mb-0">Esperando pronóstico...</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Estado de Preparación -->
+            <div class="card mb-3">
+                <div class="card-header bg-secondary text-white py-2">
+                    <h6 class="mb-0 small">📋 Estado de Preparación</h6>
+                </div>
+                <div class="card-body">
+                    <div id="preparationStatus">
+                        {% for driver in team.drivers %}
+                            {% set driver_choices_dict = {} %}
+                            {% for choice in existing_choices %}
+                                {% if driver_choices_dict.update({choice.driver_id: choice}) %}{% endif %}
+                            {% endfor %}
+                            
+                            {% set driver_choice = driver_choices_dict.get(driver.id) %}
+                            
+                            <div class="driver-status border-bottom pb-2 mb-2">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <strong class="small">{{ driver.name }}</strong>
+                                    <span class="badge bg-{% if driver_choice %}success{% else %}warning{% endif %}">
+                                        {% if driver_choice %}✅{% else %}⏳{% endif %}
+                                    </span>
+                                </div>
+                                {% if driver_choice %}
+                                <small class="text-muted">
+                                    Neumático: 
+                                    <span class="badge bg-{{ get_tyre_badge_color(driver_choice.tyre_choice) }} small">
+                                        {{ get_tyre_display_name(driver_choice.tyre_choice) }}
+                                    </span>
+                                    <button class="btn btn-sm btn-outline-danger ms-1 py-0" onclick="clearDriverChoice({{ driver.id }})">
+                                        🗑️
+                                    </button>
+                                </small>
+                                {% else %}
+                                <small class="text-muted">Sin selección</small>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    {% if is_fully_prepared %}
+                    <div class="alert alert-success mt-2 py-1">
+                        <small>✅ Tu equipo está completamente preparado</small>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-warning mt-2 py-1">
+                        <small>⚠️ Faltan selecciones para {{ team.drivers|length - existing_choices|length }} piloto(s)</small>
+                    </div>
+                    {% endif %}
+
+                    <!-- Botones de acción -->
+                    <div class="d-grid gap-1">
+                        {% if race.qualifying_session %}
+                            {% if race.qualifying_session <= now %}
+                            <button class="btn btn-success py-2" onclick="simulateQualifying()">
+                                🏁 Simular Clasificación
+                            </button>
+                            {% else %}
+                            <button class="btn btn-outline-secondary py-2" disabled>
+                                ⏳ Programada
+                            </button>
+                            <small class="text-muted d-block text-center mt-1">
+                                {{ race.qualifying_session.strftime('%d/%m %H:%M') }}
+                            </small>
+                            {% endif %}
+                        {% else %}
+                            <button class="btn btn-outline-secondary py-2" disabled>
+                                ⏳ No programada
+                            </button>
+                        {% endif %}
+
+                        <!-- Botón para limpiar todas las elecciones -->
+                        {% if existing_choices and existing_choices|length > 0 %}
+                        <button class="btn btn-outline-danger mt-1 py-2" onclick="clearAllChoices()">
+                            🗑️ Limpiar Todas
                         </button>
-                    {% endif %}
-
-                    <!-- Botón para limpiar todas las elecciones -->
-                    {% if existing_choices and existing_choices|length > 0 %}
-                    <button class="btn btn-outline-danger mt-2" onclick="clearAllChoices()">
-                        🗑️ Limpiar Todas las Elecciones
-                    </button>
-                    {% endif %}
+                        {% endif %}
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Guía Rápida de Neumáticos -->
-        <div class="card mt-3">
-            <div class="card-header bg-light">
-                <h6 class="mb-0">🧠 Guía Rápida</h6>
-            </div>
-            <div class="card-body">
-                <div class="tyre-tip mb-2">
-                    <span class="badge bg-danger me-2">🟡</span>
-                    <strong>Blando:</strong> Máxima velocidad, poca durabilidad
+            <!-- Guía Rápida de Neumáticos -->
+            <div class="card">
+                <div class="card-header bg-light py-2">
+                    <h6 class="mb-0 small">🧠 Guía Rápida</h6>
                 </div>
-                <div class="tyre-tip mb-2">
-                    <span class="badge bg-warning me-2">⚪</span>
-                    <strong>Medio:</strong> Equilibrio velocidad/durabilidad
-                </div>
-                <div class="tyre-tip mb-2">
-                    <span class="badge bg-secondary me-2">🔴</span>
-                    <strong>Duro:</strong> Máxima durabilidad, menos velocidad
-                </div>
-                <div class="tyre-tip mb-2">
-                    <span class="badge bg-info me-2">🌧️</span>
-                    <strong>Lluvia:</strong> Lluvia ligera a moderada
-                </div>
-                <div class="tyre-tip">
-                    <span class="badge bg-primary me-2">⛈️</span>
-                    <strong>Lluvia Extrema:</strong> Lluvia intensa
+                <div class="card-body">
+                    <div class="tyre-tip mb-1 small">
+                        <span class="badge bg-danger me-1">🟡</span>
+                        <strong>Blando:</strong> Máx velocidad
+                    </div>
+                    <div class="tyre-tip mb-1 small">
+                        <span class="badge bg-warning me-1">⚪</span>
+                        <strong>Medio:</strong> Equilibrio
+                    </div>
+                    <div class="tyre-tip mb-1 small">
+                        <span class="badge bg-secondary me-1">🔴</span>
+                        <strong>Duro:</strong> Durabilidad
+                    </div>
+                    <div class="tyre-tip mb-1 small">
+                        <span class="badge bg-info me-1">🌧️</span>
+                        <strong>Lluvia:</strong> Lluvia ligera
+                    </div>
+                    <div class="tyre-tip small">
+                        <span class="badge bg-primary me-1">⛈️</span>
+                        <strong>Extrema:</strong> Lluvia intensa
+                    </div>
                 </div>
             </div>
         </div>
@@ -371,40 +369,8 @@
 </div>
 
 <script>
-// Funciones JavaScript para manejar la interacción del usuario
-function get_tyre_badge_color(tyreType) {
-    const colors = { 
-        'soft': 'danger', 'medium': 'warning', 'hard': 'secondary',
-        'wet': 'info', 'extreme_wet': 'primary'
-    };
-    return colors[tyreType] || 'primary';
-}
-
-function get_tyre_display_name(tyreType) {
-    const names = { 
-        'soft': 'Blando', 'medium': 'Medio', 'hard': 'Duro',
-        'wet': 'Lluvia', 'extreme_wet': 'Lluvia Extrema'
-    };
-    return names[tyreType] || tyreType;
-}
-
-function isTyreAppropriate(tyreType, condition) {
-    if (!tyreType || !condition) return false;
-    
-    const dryTyres = ['soft', 'medium', 'hard'];
-    const wetTyres = ['wet', 'extreme_wet'];
-    
-    if (condition === 'dry') {
-        return dryTyres.includes(tyreType);
-    } else if (condition === 'light_rain') {
-        return wetTyres.includes(tyreType);
-    } else if (condition === 'heavy_rain') {
-        return tyreType === 'extreme_wet';
-    }
-    
-    return true;
-}
-
+// El resto del JavaScript permanece igual que en la versión original
+// ya que la funcionalidad no cambia, solo la presentación
 document.addEventListener('DOMContentLoaded', function() {
     const qualifyingWeather = '{{ qualifying_weather.condition if qualifying_weather and qualifying_weather.condition else "dry" }}';
     let selectedTyre = null;
@@ -439,21 +405,21 @@ document.addEventListener('DOMContentLoaded', function() {
             const experience = parseInt(selectedOption.getAttribute('data-experience')) || 0;
             
             document.getElementById('driverStats').innerHTML = `
-                <div class="col-md-4 text-center">
-                    <h6>Habilidad</h6>
-                    <div class="progress mb-2" style="height: 20px;">
+                <div class="col-4 text-center">
+                    <h6 class="small">Habilidad</h6>
+                    <div class="progress mb-2" style="height: 15px;">
                         <div class="progress-bar bg-success" style="width: ${skill}%">${skill}</div>
                     </div>
                 </div>
-                <div class="col-md-4 text-center">
-                    <h6>Consistencia</h6>
-                    <div class="progress mb-2" style="height: 20px;">
+                <div class="col-4 text-center">
+                    <h6 class="small">Consistencia</h6>
+                    <div class="progress mb-2" style="height: 15px;">
                         <div class="progress-bar bg-info" style="width: ${consistency}%">${consistency}</div>
                     </div>
                 </div>
-                <div class="col-md-4 text-center">
-                    <h6>Experiencia</h6>
-                    <div class="progress mb-2" style="height: 20px;">
+                <div class="col-4 text-center">
+                    <h6 class="small">Experiencia</h6>
+                    <div class="progress mb-2" style="height: 15px;">
                         <div class="progress-bar bg-warning" style="width: ${experience}%">${experience}</div>
                     </div>
                 </div>
@@ -479,9 +445,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         let recommendationHTML = '';
         if (isTyreAppropriate(selectedTyre, qualifyingWeather)) {
-            recommendationHTML = `<span class="badge bg-success">✅ Apropiado para las condiciones</span>`;
+            recommendationHTML = `<span class="badge bg-success small">✅ Apropiado</span>`;
         } else {
-            recommendationHTML = `<span class="badge bg-danger">⚠️ No recomendado para estas condiciones</span>`;
+            recommendationHTML = `<span class="badge bg-danger small">⚠️ No recomendado</span>`;
         }
         
         recommendation.innerHTML = recommendationHTML;
@@ -499,7 +465,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const strategy = document.getElementById('strategySelect').value;
         
         if (!isTyreAppropriate(selectedTyre, qualifyingWeather)) {
-            if (!confirm('⚠️ El neumático seleccionado no es recomendado para las condiciones actuales. ¿Estás seguro de continuar?')) {
+            if (!confirm('⚠️ El neumático seleccionado no es recomendado. ¿Continuar?')) {
                 return;
             }
         }
@@ -540,7 +506,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Función para simular clasificación
     window.simulateQualifying = function() {
-        if (!confirm('¿Simular la sesión de clasificación? Esto calculará las posiciones en la parrilla.')) {
+        if (!confirm('¿Simular la sesión de clasificación?')) {
             return;
         }
         
@@ -553,7 +519,7 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .then(data => {
                 if (data.success) {
-                    showNotification('🏁 Clasificación simulada exitosamente', 'success');
+                    showNotification('🏁 Clasificación simulada', 'success');
                     setTimeout(() => {
                         window.location.href = `/qualifying_results/{{ race.id }}`;
                     }, 2000);
@@ -563,13 +529,13 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(error => {
                 console.error('Error:', error);
-                showNotification('❌ Error al simular clasificación: ' + error.message, 'error');
+                showNotification('❌ Error al simular: ' + error.message, 'error');
             });
     };
 
     // Función para limpiar la elección de un piloto específico
     window.clearDriverChoice = function(driverId) {
-        if (!confirm(`¿Estás seguro de que quieres eliminar la elección de neumáticos para este piloto?`)) {
+        if (!confirm(`¿Eliminar elección de neumáticos?`)) {
             return;
         }
         
@@ -601,13 +567,13 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(error => {
             console.error('Error:', error);
-            showNotification('❌ Error al limpiar elección: ' + error.message, 'error');
+            showNotification('❌ Error al limpiar: ' + error.message, 'error');
         });
     };
 
     // Función para limpiar todas las elecciones
     window.clearAllChoices = function() {
-        if (!confirm(`¿Estás seguro de que quieres eliminar TODAS las elecciones de neumáticos? Esto afectará a todos los pilotos del equipo.`)) {
+        if (!confirm(`¿Eliminar TODAS las elecciones?`)) {
             return;
         }
         
@@ -638,7 +604,7 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(error => {
             console.error('Error:', error);
-            showNotification('❌ Error al limpiar elecciones: ' + error.message, 'error');
+            showNotification('❌ Error al limpiar: ' + error.message, 'error');
         });
     };
 
@@ -652,9 +618,9 @@ document.addEventListener('DOMContentLoaded', function() {
         alert.style.top = '20px';
         alert.style.right = '20px';
         alert.style.zIndex = '9999';
-        alert.style.minWidth = '300px';
+        alert.style.minWidth = '250px';
         alert.innerHTML = `
-            ${message}
+            <small>${message}</small>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         `;
         
@@ -680,39 +646,71 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+// Funciones auxiliares
+function get_tyre_badge_color(tyreType) {
+    const colors = { 
+        'soft': 'danger', 'medium': 'warning', 'hard': 'secondary',
+        'wet': 'info', 'extreme_wet': 'primary'
+    };
+    return colors[tyreType] || 'primary';
+}
+
+function get_tyre_display_name(tyreType) {
+    const names = { 
+        'soft': 'Blando', 'medium': 'Medio', 'hard': 'Duro',
+        'wet': 'Lluvia', 'extreme_wet': 'Lluvia Extrema'
+    };
+    return names[tyreType] || tyreType;
+}
+
+function isTyreAppropriate(tyreType, condition) {
+    if (!tyreType || !condition) return false;
+    
+    const dryTyres = ['soft', 'medium', 'hard'];
+    const wetTyres = ['wet', 'extreme_wet'];
+    
+    if (condition === 'dry') {
+        return dryTyres.includes(tyreType);
+    } else if (condition === 'light_rain') {
+        return wetTyres.includes(tyreType);
+    } else if (condition === 'heavy_rain') {
+        return tyreType === 'extreme_wet';
+    }
+    
+    return true;
+}
 </script>
 
 <style>
 .tyre-btn {
     text-align: left;
-    padding: 12px 15px;
-    margin-bottom: 8px;
+    margin-bottom: 5px;
     transition: all 0.3s ease;
 }
 
 .tyre-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transform: translateY(-1px);
 }
 
 .tyre-btn.active {
-    border-width: 3px;
+    border-width: 2px;
     font-weight: bold;
 }
 
 .driver-status {
-    padding: 8px 0;
+    padding: 6px 0;
 }
 
 .strategy-item {
     background-color: #f8f9fa;
-    padding: 10px;
+    padding: 8px;
     border-radius: 5px;
 }
 
 .tyre-tip {
-    font-size: 0.9em;
-    padding: 5px 0;
+    font-size: 0.8em;
+    padding: 3px 0;
 }
 
 #currentSelection {
@@ -720,12 +718,12 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 .progress {
-    border-radius: 10px;
+    border-radius: 8px;
 }
 
 .progress-bar {
-    border-radius: 10px;
-    font-size: 0.8em;
+    border-radius: 8px;
+    font-size: 0.7em;
     font-weight: bold;
 }
 
@@ -742,11 +740,6 @@ document.addEventListener('DOMContentLoaded', function() {
         transform: translateX(0);
         opacity: 1;
     }
-}
-
-.btn-sm {
-    padding: 0.15rem 0.5rem;
-    font-size: 0.75rem;
 }
 </style>
 {% endblock %}
