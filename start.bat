@@ -8,11 +8,19 @@ echo ========================================
 :: Crear carpeta de logs si no existe
 if not exist "logs" mkdir logs
 
-:: Usar PowerShell para obtener fecha sin espacios
+:start_server
+:: Usar PowerShell para obtener fecha actual sin espacios
 for /f "delims=" %%i in ('powershell -Command "Get-Date -Format 'yyyy-MM-dd'"') do set LOG_DATE=%%i
 set LOG_FILE=logs\f1_manager_%LOG_DATE%.log
 
-echo [%time%] Verificando Python... > "%LOG_FILE%"
+:: Si es un nuevo día, crear nuevo archivo de log
+if not exist "%LOG_FILE%" (
+    echo [%time%] ======================================== > "%LOG_FILE%"
+    echo [%time%]    NUEVO ARCHIVO DE LOG - %DATE% >> "%LOG_FILE%"
+    echo [%time%] ======================================== >> "%LOG_FILE%"
+)
+
+echo [%time%] Verificando Python... >> "%LOG_FILE%"
 python --version >nul 2>&1
 if errorlevel 1 (
     echo [%time%] ERROR: Python no esta instalado o no esta en el PATH >> "%LOG_FILE%"

@@ -7,12 +7,27 @@ echo "========================================"
 # Crear carpeta de logs si no existe
 mkdir -p logs
 
-# Obtener fecha para el archivo de log
-LOG_DATE=$(date +%Y-%m-%d)
-LOG_FILE="logs/f1_manager_${LOG_DATE}.log"
+# Función para obtener archivo de log actual
+get_log_file() {
+    LOG_DATE=$(date +%Y-%m-%d)
+    echo "logs/f1_manager_${LOG_DATE}.log"
+}
 
-# Iniciar log
-echo "[$(date +%T)] Iniciando F1 Manager..." > "$LOG_FILE"
+# Función para inicializar log si es nuevo archivo
+init_log() {
+    local log_file="$1"
+    if [ ! -f "$log_file" ]; then
+        echo "[$(date +%T)] ========================================" > "$log_file"
+        echo "[$(date +%T)]    NUEVO ARCHIVO DE LOG - $(date +%Y-%m-%d)" >> "$log_file"
+        echo "[$(date +%T)] ========================================" >> "$log_file"
+    fi
+}
+
+# Obtener archivo de log inicial
+LOG_FILE=$(get_log_file)
+init_log "$LOG_FILE"
+
+echo "[$(date +%T)] Iniciando F1 Manager..." >> "$LOG_FILE"
 
 echo "[$(date +%T)] Verificando Python..." >> "$LOG_FILE"
 python3 --version >> "$LOG_FILE" 2>&1
@@ -50,6 +65,12 @@ echo "[$(date +%T)] ========================================" >> "$LOG_FILE"
 # Función para extraer y mostrar direcciones
 show_addresses() {
     while IFS= read -r line; do
+        # Actualizar archivo de log si cambió el día
+        CURRENT_LOG_FILE=$(get_log_file)
+        if [ "$CURRENT_LOG_FILE" != "$LOG_FILE" ]; then
+            LOG_FILE="$CURRENT_LOG_FILE"
+            init_log "$LOG_FILE"
+        fi
         echo "$line" >> "$LOG_FILE"
         if echo "$line" | grep -q "Running on"; then
             echo "$line"
