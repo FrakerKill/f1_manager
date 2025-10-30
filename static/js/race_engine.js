@@ -72,11 +72,13 @@ class RaceEngine {
     }
 
     // SIMULACIÓN DE VUELTA MEJORADA CON COMPONENTES
-    simulateLap(driver, carComponents, tyreType, trackCondition, lapNumber, previousData = {}) {
+    simulateLap(driver, carComponents, tyreType, trackCondition, lapNumber, previousData = {}, isTestSession = false) {
         const carEffect = this.calculateCarEffect(carComponents);
-        const mechanicalRisk = this.calculateMechanicalFailureRisk(carComponents, lapNumber, 
+        
+        // SOLO CALCULAR RIESGO MECÁNICO SI NO ES UNA SESIÓN DE TEST
+        const mechanicalRisk = isTestSession ? 0 : this.calculateMechanicalFailureRisk(carComponents, lapNumber, 
             previousData.totalLaps || 60, previousData.incidents || 0);
-
+	    
         const result = {
             lapTime: 0,
             tyreWear: previousData.tyreWear || 0,
@@ -92,9 +94,9 @@ class RaceEngine {
             carPerformance: carEffect.rawPerformance,
             isNewTyre: previousData.pitStop || false
         };
-
-        // VERIFICAR FALLA MECÁNICA
-        if (Math.random() < mechanicalRisk) {
+	    
+        // VERIFICAR FALLA MECÁNICA SOLO SI NO ES TEST
+        if (!isTestSession && Math.random() < mechanicalRisk) {
             result.mechanicalFailure = true;
             result.failureComponent = this.determineFailedComponent(carComponents);
             result.incident = {

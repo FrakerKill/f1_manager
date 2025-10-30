@@ -720,7 +720,8 @@ function simulateTestSession(driver, car, initialTyre, trackCondition, totalLaps
                 currentTyre, 
                 trackCondition, 
                 lap, 
-                { ...previousData, incidents }
+                { ...previousData, incidents },
+				true
             );
 
             // Actualizar datos para siguiente vuelta
