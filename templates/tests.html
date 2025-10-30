@@ -836,13 +836,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // Configurar coche del equipo
-        const car = {
-            components: [
-                {% for component in team.car_components %}
-                { type: "{{ component.component_type }}", strength: {{ component.strength }} },
-                {% endfor %}
-            ]
-        };
+        const car = [
+            {% for component in team.car_components %}
+            { 
+                type: "{{ component.component_type }}", 
+                strength: {{ component.strength }},
+                reliability: {{ component.reliability }}
+            },
+            {% endfor %}
+        ];
 
         console.log("Iniciando test para:", driver.name, "con neumáticos:", tyreType);
 
