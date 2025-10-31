@@ -44,6 +44,15 @@ def utility_processor():
         'get_tyre_badge_color': get_tyre_badge_color,
         'get_tyre_display_name': get_tyre_display_name
     }
+    
+def format_lap_time(seconds):
+    """Convierte segundos a formato minutos:segundos.milisegundos"""
+    if not seconds or seconds <= 0:
+        return "0:00.000"
+    
+    minutes = int(seconds // 60)
+    remaining_seconds = seconds % 60
+    return f"{minutes}:{remaining_seconds:06.3f}"
 
 # Modelos de la base de datos
 class User(UserMixin, db.Model):
@@ -2510,7 +2519,7 @@ def qualifying_session(race_id):
 @app.route('/api/qualifying_results/<int:race_id>')
 @login_required
 def api_qualifying_results(race_id):
-    """API para obtener resultados de clasificación"""
+    """API para obtener resultados de clasificación - VERSIÓN MEJORADA CON VUELTAS RÁPIDAS POR SESIÓN"""
     try:
         print(f"DEBUG: Solicitando resultados de clasificación para carrera {race_id}")
         
@@ -2525,8 +2534,49 @@ def api_qualifying_results(race_id):
         
         print(f"DEBUG: Encontrados {len(results)} resultados de clasificación")
         
+        # Calcular vuelta rápida de Q1 y Q2
+        q1_fastest = None
+        q2_fastest = None
+        q1_cutoff_time = None  # Tiempo del último que pasa a Q2
+        q2_cutoff_time = None  # Tiempo del último que pasa a Q3
+        
+        for result in results:
+            # Vuelta rápida Q1
+            if result.q1_time and (q1_fastest is None or result.q1_time < q1_fastest):
+                q1_fastest = result.q1_time
+            
+            # Vuelta rápida Q2
+            if result.q2_time and (q2_fastest is None or result.q2_time < q2_fastest):
+                q2_fastest = result.q2_time
+        
+        # Calcular tiempos de corte
+        q1_times = [r.q1_time for r in results if r.q1_time is not None]
+        q1_times.sort()
+        if len(q1_times) >= 15:
+            q1_cutoff_time = q1_times[14]  # 15º tiempo (índice 14)
+        
+        q2_times = [r.q2_time for r in results if r.q2_time is not None]
+        q2_times.sort()
+        if len(q2_times) >= 10:
+            q2_cutoff_time = q2_times[9]  # 10º tiempo (índice 9)
+        
         results_data = []
         for result in results:
+            # Determinar en qué sesión fue eliminado
+            eliminated_in = 'Q3'
+            if result.q2_time is None:
+                eliminated_in = 'Q1'
+            elif result.q3_time is None:
+                eliminated_in = 'Q2'
+            
+            # Marcar si es vuelta rápida de la sesión
+            is_q1_fastest = result.q1_time == q1_fastest
+            is_q2_fastest = result.q2_time == q2_fastest
+            
+            # Marcar si es el último en pasar el corte
+            is_q1_cutoff = result.q1_time == q1_cutoff_time
+            is_q2_cutoff = result.q2_time == q2_cutoff_time
+            
             results_data.append({
                 'driver_name': result.driver.name,
                 'team_name': result.team.team_name,
@@ -2534,7 +2584,16 @@ def api_qualifying_results(race_id):
                 'q1_time': result.q1_time,
                 'q2_time': result.q2_time,
                 'q3_time': result.q3_time,
-                'final_position': result.final_position
+                'final_position': result.final_position,
+                'eliminated_in': eliminated_in,
+                'is_q1_fastest': is_q1_fastest,
+                'is_q2_fastest': is_q2_fastest,
+                'is_q1_cutoff': is_q1_cutoff,
+                'is_q2_cutoff': is_q2_cutoff,
+                'q1_fastest_time': q1_fastest,
+                'q2_fastest_time': q2_fastest,
+                'q1_cutoff_time': q1_cutoff_time,
+                'q2_cutoff_time': q2_cutoff_time
             })
             print(f"DEBUG - Resultado: {result.driver.name}, Pos: {result.final_position}, Q1: {result.q1_time}")
         
@@ -3091,6 +3150,7 @@ def get_safe_event_title(event_type, driver_name="Piloto"):
         'race_dnf': f'{safe_driver_name} ABANDONA',
         'race_safety_car': 'SAFETY CAR',
         'race_virtual_safety_car': 'VIRTUAL SAFETY CAR',
+        'race_off_track': f'{safe_driver_name} apuro demasiado los limites',
     }
     
     return titles.get(event_type, f'Evento: {event_type}')
@@ -3118,6 +3178,36 @@ def debug_events(race_id):
         })
     
     return jsonify(diagnostic)
+    
+@app.route('/debug/delete_events/<int:race_id>')
+@login_required
+def debug_delete_events(race_id):
+    """Ruta de depuración para eliminar eventos de una carrera específica"""
+    try:
+        # Verificar que la carrera existe
+        race = Race.query.get(race_id)
+        if not race:
+            return jsonify({'success': False, 'message': f'Carrera {race_id} no encontrada'})
+        
+        # Contar eventos antes de eliminar
+        events_before = LiveEvent.query.filter_by(race_id=race_id).count()
+        
+        # Eliminar todos los eventos de esta carrera
+        deleted_count = LiveEvent.query.filter_by(race_id=race_id).delete()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': f'✅ {deleted_count} eventos eliminados de la carrera {race_id} ({race.circuit.name})',
+            'deleted_count': deleted_count,
+            'race_id': race_id,
+            'circuit_name': race.circuit.name
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'❌ Error eliminando eventos: {str(e)}'})
 
 @app.route('/api/simulate_qualifying_live/<int:race_id>')
 @login_required
@@ -3228,13 +3318,16 @@ def run_qualifying_simulation(race_id, user_id):
             # EVENTO FINAL DE QUALIFYING CON POLE
             if final_results:
                 pole_winner = final_results[0]
+                # Obtener el mejor tiempo del pole winner
+                pole_time = pole_winner.get("q3_time", pole_winner.get("q2_time", pole_winner.get("q1_time", 0)))
+                
                 pole_event = LiveEvent(
                     race_id=race_id,
                     team_id=pole_winner['team_id'],
                     driver_id=pole_winner['driver_id'],
                     lap=0,
                     event_type='qualifying_pole',
-                    description=f'🏆 {pole_winner["driver_name"]} CONSIGUE LA POLE POSITION! - {pole_winner.get("q3_time", pole_winner.get("q2_time", pole_winner.get("q1_time", 0))):.3f}s',
+                    description=f'🏆 {pole_winner["driver_name"]} CONSIGUE LA POLE POSITION! - {format_lap_time(pole_time)}',
                     session_type='qualifying'
                 )
                 db.session.add(pole_event)
@@ -3319,7 +3412,7 @@ def simulate_qualifying_with_engine(qualifying_choices, race_id):
                 driver_id=choice.driver_id,
                 lap=1,
                 event_type='qualifying_fast_lap',
-                description=f'🚀 {choice.driver.name} marca {q1_time:.3f}s en Q1',
+                description=f'🚀 {choice.driver.name} marca {format_lap_time(q1_time)} en Q1',
                 session_type='qualifying'
             )
             db.session.add(event)
@@ -3330,6 +3423,40 @@ def simulate_qualifying_with_engine(qualifying_choices, race_id):
     q1_results.sort(key=lambda x: x['q1_time'])
     q2_participants = q1_results[:15] if len(q1_results) > 15 else q1_results
     eliminated_q1 = q1_results[15:] if len(q1_results) > 15 else []
+    
+    # CALCULAR VUELTA RÁPIDA Y CORTE DE Q1
+    q1_fastest = min([r['q1_time'] for r in q1_results]) if q1_results else None
+    q1_cutoff_time = q2_participants[-1]['q1_time'] if q2_participants else None
+    
+    # Evento de vuelta rápida Q1
+    if q1_fastest:
+        fastest_q1_driver = next((p for p in q1_results if p['q1_time'] == q1_fastest), None)
+        if fastest_q1_driver:
+            event = LiveEvent(
+                race_id=race_id,
+                team_id=fastest_q1_driver['team_id'],
+                driver_id=fastest_q1_driver['driver_id'],
+                lap=1,
+                event_type='qualifying_fast_lap',
+                description=f'🏆 {fastest_q1_driver["driver_name"]} MARCA LA VUELTA RÁPIDA DE Q1: {format_lap_time(q1_fastest)}!',
+                session_type='qualifying'
+            )
+            db.session.add(event)
+    
+    # Evento de corte Q1
+    if q1_cutoff_time:
+        cutoff_q1_driver = next((p for p in q1_results if p['q1_time'] == q1_cutoff_time), None)
+        if cutoff_q1_driver:
+            event = LiveEvent(
+                race_id=race_id,
+                team_id=cutoff_q1_driver['team_id'],
+                driver_id=cutoff_q1_driver['driver_id'],
+                lap=1,
+                event_type='qualifying_eliminated',
+                description=f'⏰ {cutoff_q1_driver["driver_name"]} ES EL ÚLTIMO EN PASAR A Q2: {format_lap_time(q1_cutoff_time)}',
+                session_type='qualifying'
+            )
+            db.session.add(event)
     
     # Evento de eliminación Q1
     if eliminated_q1:
@@ -3343,6 +3470,8 @@ def simulate_qualifying_with_engine(qualifying_choices, race_id):
             session_type='qualifying'
         )
         db.session.add(elimination_event)
+    
+    db.session.commit()
     
     # SIMULAR Q2 - TOP 15
     print("=== Q2 INICIADO (CON COMPONENTES) ===")
@@ -3374,6 +3503,40 @@ def simulate_qualifying_with_engine(qualifying_choices, race_id):
     q3_participants = q2_results[:10] if len(q2_results) > 10 else q2_results
     eliminated_q2 = q2_results[10:] if len(q2_results) > 10 else []
     
+    # CALCULAR VUELTA RÁPIDA Y CORTE DE Q2
+    q2_fastest = min([r['q2_time'] for r in q2_results]) if q2_results else None
+    q2_cutoff_time = q3_participants[-1]['q2_time'] if q3_participants else None
+    
+    # Evento de vuelta rápida Q2
+    if q2_fastest:
+        fastest_q2_driver = next((p for p in q2_results if p['q2_time'] == q2_fastest), None)
+        if fastest_q2_driver:
+            event = LiveEvent(
+                race_id=race_id,
+                team_id=fastest_q2_driver['team_id'],
+                driver_id=fastest_q2_driver['driver_id'],
+                lap=2,
+                event_type='qualifying_fast_lap',
+                description=f'🏆 {fastest_q2_driver["driver_name"]} MARCA LA VUELTA RÁPIDA DE Q2: {format_lap_time(q2_fastest)}!',
+                session_type='qualifying'
+            )
+            db.session.add(event)
+    
+    # Evento de corte Q2
+    if q2_cutoff_time:
+        cutoff_q2_driver = next((p for p in q2_results if p['q2_time'] == q2_cutoff_time), None)
+        if cutoff_q2_driver:
+            event = LiveEvent(
+                race_id=race_id,
+                team_id=cutoff_q2_driver['team_id'],
+                driver_id=cutoff_q2_driver['driver_id'],
+                lap=2,
+                event_type='qualifying_eliminated',
+                description=f'⏰ {cutoff_q2_driver["driver_name"]} ES EL ÚLTIMO EN PASAR A Q3: {format_lap_time(q2_cutoff_time)}',
+                session_type='qualifying'
+            )
+            db.session.add(event)
+    
     # Evento final Q2
     if eliminated_q2:
         q2_end = LiveEvent(
@@ -3386,6 +3549,8 @@ def simulate_qualifying_with_engine(qualifying_choices, race_id):
             session_type='qualifying'
         )
         db.session.add(q2_end)
+    
+    db.session.commit()
     
     # SIMULAR Q3 - TOP 10 (SHOOTOUT)
     print("=== Q3 INICIADO (CON COMPONENTES) ===")
@@ -3406,7 +3571,7 @@ def simulate_qualifying_with_engine(qualifying_choices, race_id):
             driver_id=participant['driver_id'],
             lap=3,
             event_type='qualifying_fast_lap',
-            description=f'🏎️ {participant["driver_name"]} marca {q3_time:.3f}s en Q3!',
+            description=f'🏎️ {participant["driver_name"]} marca {format_lap_time(q3_time)} en Q3!',
             session_type='qualifying'
         )
         db.session.add(event)
@@ -3423,7 +3588,7 @@ def simulate_qualifying_with_engine(qualifying_choices, race_id):
             driver_id=0,
             lap=3,
             event_type='qualifying_end',
-            description=f'🏁 CLASIFICACIÓN FINALIZADA - {pole_winner["driver_name"]} consigue la POLE POSITION con {pole_winner.get("q3_time", 0):.3f}s!',
+            description=f'🏁 CLASIFICACIÓN FINALIZADA - {pole_winner["driver_name"]} consigue la POLE POSITION con {format_lap_time(pole_winner.get("q3_time", 0))}!',
             session_type='qualifying'
         )
         db.session.add(final_event)

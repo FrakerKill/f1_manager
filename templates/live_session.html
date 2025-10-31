@@ -383,6 +383,33 @@
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     margin-bottom: 10px;
 }
+
+/* Estilos para vueltas rápidas y cortes en qualifying */
+.q1-fastest {
+    background: linear-gradient(135deg, rgba(25, 135, 84, 0.1) 0%, rgba(25, 135, 84, 0.05) 100%) !important;
+    border-left: 4px solid #198754 !important;
+}
+
+.q2-fastest {
+    background: linear-gradient(135deg, rgba(13, 202, 240, 0.1) 0%, rgba(13, 202, 240, 0.05) 100%) !important;
+    border-left: 4px solid #0dcaf0 !important;
+}
+
+.q1-cutoff, .q2-cutoff {
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.1) 0%, rgba(255, 193, 7, 0.05) 100%) !important;
+    border-left: 4px solid #ffc107 !important;
+}
+
+.session-times {
+    font-size: 0.7rem;
+}
+
+.session-times small {
+    background-color: #f8f9fa;
+    padding: 1px 4px;
+    border-radius: 3px;
+    border: 1px solid #e9ecef;
+}
 </style>
 
 <script>
@@ -560,7 +587,7 @@ function loadLiveEvents() {
         });
 }
 
-// FUNCIÓN MEJORADA PARA CARGAR CLASIFICACIÓN
+// FUNCIÓN MEJORADA PARA CARGAR CLASIFICACIÓN CON INFORMACIÓN DE VUELTAS RÁPIDAS
 function loadStandings() {
     const standingsContainer = document.getElementById('live-standings');
     
@@ -602,14 +629,32 @@ function loadStandings() {
                 `;
             } else {
                 if (sessionType === 'qualifying') {
-                    // Renderizar clasificación
+                    // Renderizar clasificación con información de vueltas rápidas
                     standings.forEach((result, index) => {
                         const position = result.final_position || index + 1;
                         const bestTime = result.q3_time || result.q2_time || result.q1_time;
                         const isPole = position === 1;
                         
+                        // Determinar clase especial para vueltas rápidas y cortes
+                        let specialClass = '';
+                        let specialBadge = '';
+                        
+                        if (result.is_q1_fastest) {
+                            specialClass = 'q1-fastest';
+                            specialBadge = '<small class="badge bg-success ms-1">VL Q1</small>';
+                        } else if (result.is_q2_fastest) {
+                            specialClass = 'q2-fastest';
+                            specialBadge = '<small class="badge bg-info ms-1">VL Q2</small>';
+                        } else if (result.is_q1_cutoff) {
+                            specialClass = 'q1-cutoff';
+                            specialBadge = '<small class="badge bg-warning ms-1">Corte Q1</small>';
+                        } else if (result.is_q2_cutoff) {
+                            specialClass = 'q2-cutoff';
+                            specialBadge = '<small class="badge bg-warning ms-1">Corte Q2</small>';
+                        }
+                        
                         standingsHTML += `
-                            <div class="standings-row d-flex align-items-center ${isPole ? 'pole' : ''}">
+                            <div class="standings-row d-flex align-items-center ${isPole ? 'pole' : ''} ${specialClass}">
                                 <div class="standings-position">
                                     ${position}
                                     ${isPole ? '🥇' : position === 2 ? '🥈' : position === 3 ? '🥉' : ''}
@@ -620,17 +665,56 @@ function loadStandings() {
                                 <div class="flex-grow-1">
                                     <strong class="d-block">${result.driver_name}</strong>
                                     <small class="text-muted">${result.team_name}</small>
+                                    <div class="session-times mt-1">
+                                        ${result.q1_time ? `<small class="text-muted me-2">Q1: ${formatLapTime(result.q1_time)}</small>` : ''}
+                                        ${result.q2_time ? `<small class="text-muted me-2">Q2: ${formatLapTime(result.q2_time)}</small>` : ''}
+                                        ${result.q3_time ? `<small class="text-muted">Q3: ${formatLapTime(result.q3_time)}</small>` : ''}
+                                    </div>
                                 </div>
                                 <div class="text-end">
-                                    <div class="fw-bold">${bestTime ? bestTime.toFixed(3) + 's' : 'N/A'}</div>
+                                    <div class="fw-bold">${bestTime ? formatLapTime(bestTime) : 'N/A'}</div>
                                     <small class="badge bg-${getTyreColor(result.tyre_choice)}">${getTyreName(result.tyre_choice)}</small>
                                     ${isPole ? '<small class="badge bg-success ms-1">POLE</small>' : ''}
+                                    ${specialBadge}
                                 </div>
                             </div>
                         `;
                     });
+                    
+                    // Añadir resumen de vueltas rápidas y cortes
+                    if (standings.length > 0 && (standings[0].q1_fastest_time || standings[0].q2_fastest_time)) {
+                        const summary = standings[0];
+                        let summaryHTML = '';
+                        
+                        if (summary.q1_fastest_time) {
+                            summaryHTML += `
+                                <div class="p-2 border-top bg-light">
+                                    <small class="text-muted">
+                                        <i class="fas fa-trophy me-1"></i>
+                                        <strong>Vuelta rápida Q1:</strong> ${formatLapTime(summary.q1_fastest_time)}
+                                        ${summary.q1_cutoff_time ? ` • <strong>Corte Q1:</strong> ${formatLapTime(summary.q1_cutoff_time)}` : ''}
+                                    </small>
+                                </div>
+                            `;
+                        }
+                        
+                        if (summary.q2_fastest_time) {
+                            summaryHTML += `
+                                <div class="p-2 border-top bg-light">
+                                    <small class="text-muted">
+                                        <i class="fas fa-trophy me-1"></i>
+                                        <strong>Vuelta rápida Q2:</strong> ${formatLapTime(summary.q2_fastest_time)}
+                                        ${summary.q2_cutoff_time ? ` • <strong>Corte Q2:</strong> ${formatLapTime(summary.q2_cutoff_time)}` : ''}
+                                    </small>
+                                </div>
+                            `;
+                        }
+                        
+                        standingsHTML += summaryHTML;
+                    }
+                    
                 } else {
-                    // Renderizar resultados de carrera
+                    // Renderizar resultados de carrera (código existente)
                     standings.forEach((result, index) => {
                         const position = result.position || index + 1;
                         const isWinner = position === 1;
