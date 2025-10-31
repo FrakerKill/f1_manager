@@ -123,21 +123,30 @@
                                 ({{ (test_forecast.probability * 100)|round|int }}%)
                             </div>
                             {% endif %}
-                            {% if race.test_session > now %}
+                            
+                            <!-- Lógica de estado mejorada para Tests -->
+                            {% if is_test_window_open %}
+                                <span class="badge bg-success">Disponible</span>
+                            {% elif race.test_session > now %}
                                 <span class="badge bg-warning">Próximamente</span>
                             {% else %}
-                                <span class="badge bg-success">Realizado</span>
+                                <span class="badge bg-secondary">Finalizado</span>
                             {% endif %}
+                            
                         </div>
                         <div class="col-md-4 text-end">
-                            {% if race.test_session <= now %}
+                            {% if is_test_window_open %}
                                 <a href="{{ url_for('test_session', race_id=race.id) }}" 
                                    class="btn btn-outline-primary btn-sm">
-                                    <i class="fas fa-chart-line"></i> Ver Tests
+                                    <i class="fas fa-chart-line"></i> Realizar Tests
                                 </a>
+                            {% elif race.test_session > now %}
+                                <button class="btn btn-outline-secondary btn-sm" disabled>
+                                    No disponible aún
+                                </button>
                             {% else %}
                                 <button class="btn btn-outline-secondary btn-sm" disabled>
-                                    Próximamente
+                                    Ventana cerrada
                                 </button>
                             {% endif %}
                         </div>
@@ -179,19 +188,31 @@
                                     <span class="badge bg-secondary">Programado</span>
                                 {% endif %}
                             {% else %}
-                                <span class="badge bg-success">Realizado</span>
+                                {% if has_qualifying_events %}
+                                    <span class="badge bg-success">Completado</span>
+                                {% else %}
+                                    <span class="badge bg-info">Listo para simular</span>
+                                {% endif %}
                             {% endif %}
                         </div>
                         <div class="col-md-4 text-end">
                             {% if has_qualifying_events %}
+                                <!-- Solo mostrar si HAY eventos de clasificación -->
                                 <a href="{{ url_for('live_session', race_id=race.id, session_type='qualifying') }}" 
                                    class="btn btn-primary btn-sm">
                                     <i class="fas fa-tv"></i> Ver Clasificación
                                 </a>
                             {% else %}
-                                <button class="btn btn-success btn-sm" onclick="simulateQualifying({{ race.id }})">
-                                    <i class="fas fa-play"></i> Simular Clasificación
-                                </button>
+                                <!-- Solo mostrar botón de simular si NO hay eventos pero YA PASÓ la hora -->
+                                {% if race.qualifying_session <= now %}
+                                    <button class="btn btn-success btn-sm" onclick="simulateQualifying({{ race.id }})">
+                                        <i class="fas fa-play"></i> Simular Clasificación
+                                    </button>
+                                {% else %}
+                                    <button class="btn btn-outline-secondary btn-sm" disabled>
+                                        Esperando hora programada
+                                    </button>
+                                {% endif %}
                             {% endif %}
                         </div>
                     </div>
@@ -232,19 +253,31 @@
                                     <span class="badge bg-secondary">Programado</span>
                                 {% endif %}
                             {% else %}
-                                <span class="badge bg-success">Realizado</span>
+                                {% if has_race_events %}
+                                    <span class="badge bg-success">Completado</span>
+                                {% else %}
+                                    <span class="badge bg-info">Listo para simular</span>
+                                {% endif %}
                             {% endif %}
                         </div>
                         <div class="col-md-4 text-end">
                             {% if has_race_events %}
+                                <!-- Solo mostrar si HAY eventos de carrera -->
                                 <a href="{{ url_for('live_session', race_id=race.id, session_type='race') }}" 
                                    class="btn btn-primary btn-sm">
                                     <i class="fas fa-tv"></i> Ver Carrera
                                 </a>
                             {% else %}
-                                <button class="btn btn-success btn-sm" onclick="simulateRace({{ race.id }})">
-                                    <i class="fas fa-play"></i> Simular Carrera
-                                </button>
+                                <!-- Solo mostrar botón de simular si NO hay eventos pero YA PASÓ la hora -->
+                                {% if race.race_session <= now %}
+                                    <button class="btn btn-success btn-sm" onclick="simulateRace({{ race.id }})">
+                                        <i class="fas fa-play"></i> Simular Carrera
+                                    </button>
+                                {% else %}
+                                    <button class="btn btn-outline-secondary btn-sm" disabled>
+                                        Esperando hora programada
+                                    </button>
+                                {% endif %}
                             {% endif %}
                         </div>
                     </div>

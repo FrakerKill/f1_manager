@@ -1813,21 +1813,33 @@ def race_details(race_id):
         
     now = datetime.utcnow()
     
-    # Determinar si hay eventos/results para mostrar los botones correctos
-    has_qualifying_events = any(event.event_type and 'qualifying' in event.event_type for event in live_events)
-    has_race_events = any(event.event_type and 'race' in event.event_type for event in live_events)
+    # CORREGIDO: Lógica SIMPLIFICADA - solo verificar si hay eventos
+    # Para clasificación: eventos que empiecen con 'qualifying_'
+    has_qualifying_events = any(
+        event.event_type and event.event_type.startswith('qualifying_') 
+        for event in live_events
+    )
     
-    # Si no hay eventos pero sí hay resultados en la base de datos, también mostrar botones "Ver"
-    has_qualifying_results = len(qualifying_results) > 0
-    has_race_results = len(race_results) > 0
+    # Para carrera: eventos que empiecen con 'race_'
+    has_race_events = any(
+        event.event_type and event.event_type.startswith('race_') 
+        for event in live_events
+    )
+    
+    # VENTANA DE TESTS SIMPLIFICADA - disponible desde 1 semana antes hasta 1 hora antes de la clasificación
+    test_window_start = race.qualifying_session - timedelta(days=7)  # 1 semana antes de la clasificación
+    test_window_end = race.qualifying_session - timedelta(hours=1)   # Hasta 1 hora antes de la clasificación
+    
+    is_test_window_open = test_window_start <= now <= test_window_end
     
     return render_template('race.html', 
                          race=race, 
                          now=now, 
                          weather_forecasts=weather_forecasts,
                          live_events=live_events,
-                         has_qualifying_events=has_qualifying_events or has_qualifying_results,
-                         has_race_events=has_race_events or has_race_results)
+                         has_qualifying_events=has_qualifying_events,
+                         has_race_events=has_race_events,
+                         is_test_window_open=is_test_window_open)
 
 @app.route('/tests/<int:race_id>')
 @login_required
