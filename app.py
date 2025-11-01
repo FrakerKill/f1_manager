@@ -1562,7 +1562,7 @@ def scheduled_test_cleanup():
             print(f"🧹 {deleted_count} tests antiguos eliminados automáticamente")
             
 def scheduled_session_starter():
-    """Inicia automáticamente las simulaciones cuando llega la hora programada"""
+    """Inicia automáticamente las simulaciones cuando llega la hora programada - VERSIÓN MEJORADA"""
     with app.app_context():
         try:
             now = datetime.utcnow()
@@ -1574,19 +1574,90 @@ def scheduled_session_starter():
             for race in races:
                 # Verificar sesión de clasificación
                 if should_start_session(race.qualifying_session, now):
-                    print(f"🏁 Iniciando clasificación automática para {race.circuit.name}")
-                    start_qualifying_simulation(race.id)
+                    # Verificar si ya hay eventos de qualifying para evitar duplicados
+                    existing_events = LiveEvent.query.filter_by(
+                        race_id=race.id, 
+                        session_type='qualifying',
+                        event_type='qualifying_start'
+                    ).first()
+                    
+                    if not existing_events:
+                        print(f"🏁 Iniciando clasificación automática para {race.circuit.name}")
+                        start_qualifying_simulation(race.id)
+                    else:
+                        print(f"⏭️ Clasificación ya iniciada para {race.circuit.name}")
                 
                 # Verificar sesión de carrera
                 if should_start_session(race.race_session, now):
-                    print(f"🏎️ Iniciando carrera automática para {race.circuit.name}")
-                    start_race_simulation(race.id)
+                    # Verificar si ya hay eventos de carrera para evitar duplicados
+                    existing_events = LiveEvent.query.filter_by(
+                        race_id=race.id, 
+                        session_type='race',
+                        event_type='race_start'
+                    ).first()
                     
+                    if not existing_events:
+                        print(f"🏎️ Iniciando carrera automática para {race.circuit.name}")
+                        start_race_simulation(race.id)
+                    else:
+                        print(f"⏭️ Carrera ya iniciada para {race.circuit.name}")
+                        
         except Exception as e:
             print(f"❌ Error en scheduled_session_starter: {str(e)}")
+            import traceback
+            traceback.print_exc()
+
+@app.route('/debug/session_status')
+@login_required
+def debug_session_status():
+    """Diagnóstico del estado de las sesiones programadas"""
+    now = datetime.utcnow()
+    races = Race.query.all()
+    
+    status_info = []
+    
+    for race in races:
+        race_info = {
+            'race_id': race.id,
+            'circuit': race.circuit.name,
+            'sessions': []
+        }
+        
+        sessions = [
+            ('test', race.test_session),
+            ('qualifying', race.qualifying_session),
+            ('race', race.race_session)
+        ]
+        
+        for session_type, session_time in sessions:
+            if session_time:
+                time_diff = (session_time.replace(tzinfo=None) - now.replace(tzinfo=None)).total_seconds()
+                should_start = should_start_session(session_time, now)
+                
+                # Verificar si ya hay eventos
+                existing_events = LiveEvent.query.filter_by(
+                    race_id=race.id,
+                    session_type=session_type
+                ).count()
+                
+                race_info['sessions'].append({
+                    'type': session_type,
+                    'scheduled_time': session_time.isoformat(),
+                    'time_diff_seconds': time_diff,
+                    'should_start': should_start,
+                    'existing_events': existing_events,
+                    'status': 'PENDING' if time_diff > 60 else 'READY' if should_start else 'MISSED'
+                })
+        
+        status_info.append(race_info)
+    
+    return jsonify({
+        'current_time': now.isoformat(),
+        'races': status_info
+    })
 
 def should_start_session(session_time, current_time):
-    """Determina si una sesión debe iniciarse"""
+    """Determina si una sesión debe iniciarse - VERSIÓN MEJORADA"""
     if not session_time:
         return False
     
@@ -1594,9 +1665,12 @@ def should_start_session(session_time, current_time):
     session_naive = session_time.replace(tzinfo=None)
     current_naive = current_time.replace(tzinfo=None)
     
-    # Verificar si la hora actual está dentro de la ventana de inicio (± 2 minutos)
+    # Verificar si la hora actual está después de la hora programada
+    # Y dentro de una ventana razonable (hasta 1 hora después)
     time_diff = (current_naive - session_naive).total_seconds()
-    return abs(time_diff) <= 120  # 2 minutos de margen
+    
+    # Iniciar si estamos entre 1 minuto antes y 60 minutos después
+    return -60 <= time_diff <= 3600
 
 def start_qualifying_simulation(race_id):
     """Inicia la simulación de clasificación en segundo plano"""
