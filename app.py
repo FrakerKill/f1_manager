@@ -1562,7 +1562,7 @@ def scheduled_test_cleanup():
             print(f"🧹 {deleted_count} tests antiguos eliminados automáticamente")
             
 def scheduled_session_starter():
-    """Inicia automáticamente las simulaciones cuando llega la hora programada - VERSIÓN MEJORADA"""
+    """Inicia automáticamente las simulaciones cuando llega la hora programada - VERSIÓN CORREGIDA"""
     with app.app_context():
         try:
             now = datetime.utcnow()
@@ -1572,40 +1572,66 @@ def scheduled_session_starter():
             races = Race.query.all()
             
             for race in races:
-                # Verificar sesión de clasificación
-                if should_start_session(race.qualifying_session, now):
-                    # Verificar si ya hay eventos de qualifying para evitar duplicados
-                    existing_events = LiveEvent.query.filter_by(
-                        race_id=race.id, 
-                        session_type='qualifying',
-                        event_type='qualifying_start'
-                    ).first()
-                    
-                    if not existing_events:
-                        print(f"🏁 Iniciando clasificación automática para {race.circuit.name}")
-                        start_qualifying_simulation(race.id)
-                    else:
-                        print(f"⏭️ Clasificación ya iniciada para {race.circuit.name}")
-                
-                # Verificar sesión de carrera
+                # VERIFICAR CARRERA - Lógica corregida
                 if should_start_session(race.race_session, now):
-                    # Verificar si ya hay eventos de carrera para evitar duplicados
-                    existing_events = LiveEvent.query.filter_by(
-                        race_id=race.id, 
-                        session_type='race',
-                        event_type='race_start'
+                    # Verificar si YA HAY RESULTADOS de carrera (no solo eventos)
+                    existing_race_results = ChampionshipStandings.query.filter_by(
+                        race_id=race.id
                     ).first()
                     
-                    if not existing_events:
-                        print(f"🏎️ Iniciando carrera automática para {race.circuit.name}")
-                        start_race_simulation(race.id)
+                    if not existing_race_results:
+                        print(f"🏎️ INICIANDO CARRERA AUTOMÁTICA para {race.circuit.name}")
+                        success = start_race_simulation(race.id)
+                        if success:
+                            print(f"✅ Carrera automática iniciada: {race.circuit.name}")
+                        else:
+                            print(f"❌ Error al iniciar carrera: {race.circuit.name}")
                     else:
-                        print(f"⏭️ Carrera ya iniciada para {race.circuit.name}")
+                        print(f"⏭️ Carrera ya completada: {race.circuit.name}")
+                
+                # VERIFICAR CLASIFICACIÓN - Lógica corregida  
+                if should_start_session(race.qualifying_session, now):
+                    # Verificar si YA HAY RESULTADOS de clasificación (no solo eventos)
+                    existing_qualifying_results = QualifyingSession.query.filter_by(
+                        race_id=race.id
+                    ).filter(QualifyingSession.q1_time.isnot(None)).first()
+                    
+                    if not existing_qualifying_results:
+                        print(f"🏁 INICIANDO CLASIFICACIÓN AUTOMÁTICA para {race.circuit.name}")
+                        success = start_qualifying_simulation(race.id)
+                        if success:
+                            print(f"✅ Clasificación automática iniciada: {race.circuit.name}")
+                        else:
+                            print(f"❌ Error al iniciar clasificación: {race.circuit.name}")
+                    else:
+                        print(f"⏭️ Clasificación ya completada: {race.circuit.name}")
                         
         except Exception as e:
-            print(f"❌ Error en scheduled_session_starter: {str(e)}")
+            print(f"❌ Error crítico en scheduled_session_starter: {str(e)}")
             import traceback
             traceback.print_exc()
+
+def should_start_session(session_time, current_time):
+    """Determina si una sesión debe iniciarse - VERSIÓN MEJORADA"""
+    if not session_time:
+        return False
+    
+    # Convertir a timezone-naive para comparación
+    session_naive = session_time.replace(tzinfo=None)
+    current_naive = current_time.replace(tzinfo=None)
+    
+    # Verificar si la hora actual está después de la hora programada
+    # Ventana: desde 1 minuto antes hasta 2 horas después (más flexible)
+    time_diff = (current_naive - session_naive).total_seconds()
+    
+    # DEBUG: Mostrar información de tiempos
+    print(f"DEBUG: Session: {session_naive}, Current: {current_naive}, Diff: {time_diff}s")
+    
+    # Iniciar si estamos entre 1 minuto antes y 2 horas después
+    should_start = -60 <= time_diff <= 7200
+    print(f"DEBUG: Should start: {should_start}")
+    
+    return should_start
 
 @app.route('/debug/session_status')
 @login_required
@@ -1713,14 +1739,20 @@ def start_qualifying_simulation(race_id):
         return False
 
 def start_race_simulation(race_id):
-    """Inicia la simulación de carrera en segundo plano"""
+    """Inicia la simulación de carrera en segundo plano - VERSIÓN MEJORADA"""
     try:
         race = Race.query.get(race_id)
         if not race:
             print(f"❌ Carrera {race_id} no encontrada")
             return False
         
-        print(f"🚀 Iniciando simulación de carrera en segundo plano para {race.circuit.name}")
+        print(f"🚀 INICIANDO SIMULACIÓN DE CARRERA AUTOMÁTICA para {race.circuit.name}")
+        
+        # Verificar que hay resultados de clasificación para la parrilla de salida
+        qualifying_results = QualifyingSession.query.filter_by(race_id=race_id).count()
+        if qualifying_results == 0:
+            print(f"❌ No hay resultados de clasificación para la carrera {race_id}")
+            return False
         
         # Usar threading para ejecutar en segundo plano
         import threading
@@ -1744,12 +1776,14 @@ def start_race_simulation(race_id):
         db.session.add(event)
         db.session.commit()
         
-        print(f"✅ Carrera automática iniciada para {race.circuit.name}")
+        print(f"✅ Carrera automática iniciada correctamente para {race.circuit.name}")
         return True
         
     except Exception as e:
-        print(f"❌ Error iniciando carrera automática: {str(e)}")
         db.session.rollback()
+        print(f"❌ Error crítico iniciando carrera automática: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def run_race_simulation_wrapper(race_id):

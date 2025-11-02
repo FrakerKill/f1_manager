@@ -113,34 +113,49 @@
                         </div>
                         {% endif %}
                         
-                        <!-- Cuenta atrás -->
+                        <!-- Tiempo estático (sin contador en tiempo real) -->
                         {% if seconds_to_session > 0 %}
-                        <div id="countdown-timer" class="countdown-container mb-3">
+                        <div class="countdown-container mb-3">
                             <div class="row text-center">
                                 <div class="col-3">
                                     <div class="countdown-box">
-                                        <span id="countdown-days" class="countdown-number">00</span>
+                                        {% set days = (seconds_to_session / (24 * 60 * 60))|int %}
+                                        <span class="countdown-number">
+                                            {{ "%02d" % days }}
+                                        </span>
                                         <small class="countdown-label">Días</small>
                                     </div>
                                 </div>
                                 <div class="col-3">
                                     <div class="countdown-box">
-                                        <span id="countdown-hours" class="countdown-number">00</span>
+                                        {% set hours = ((seconds_to_session % (24 * 60 * 60)) / (60 * 60))|int %}
+                                        <span class="countdown-number">
+                                            {{ "%02d" % hours }}
+                                        </span>
                                         <small class="countdown-label">Horas</small>
                                     </div>
                                 </div>
                                 <div class="col-3">
                                     <div class="countdown-box">
-                                        <span id="countdown-minutes" class="countdown-number">00</span>
+                                        {% set minutes = ((seconds_to_session % (60 * 60)) / 60)|int %}
+                                        <span class="countdown-number">
+                                            {{ "%02d" % minutes }}
+                                        </span>
                                         <small class="countdown-label">Min</small>
                                     </div>
                                 </div>
                                 <div class="col-3">
                                     <div class="countdown-box">
-                                        <span id="countdown-seconds" class="countdown-number">00</span>
+                                        {% set seconds = (seconds_to_session % 60)|int %}
+                                        <span class="countdown-number">
+                                            {{ "%02d" % seconds }}
+                                        </span>
                                         <small class="countdown-label">Seg</small>
                                     </div>
                                 </div>
+                            </div>
+                            <div class="small text-muted mt-2">
+                                ⏰ Actualizado: {{ now.strftime('%H:%M:%S') }}
                             </div>
                         </div>
                         {% endif %}
@@ -148,7 +163,7 @@
                         <div class="event-actions">
                             {% if seconds_to_session <= 0 and seconds_to_session > -7200 %}
                             <a href="{{ url_for('live_session', race_id=next_event.race_id, session_type=next_event.session_type) }}" 
-                               class="btn btn-danger btn-sm w-100 mb-2 live-button">
+                               class="btn btn-danger btn-sm w-100 mb-2">
                                🔴 VER DIRECTO
                             </a>
                             {% elif seconds_to_session <= -7200 %}
@@ -189,6 +204,11 @@
                             <a href="{{ url_for('race_details', race_id=next_event.race_id) }}" class="btn btn-sm btn-outline-secondary w-100 mt-1">
                                 Ver Detalles del Evento
                             </a>
+
+                            <!-- Botón para actualizar manualmente -->
+                            <button onclick="window.location.reload()" class="btn btn-sm btn-outline-primary w-100 mt-2">
+                                🔄 Actualizar
+                            </button>
                         </div>
                     </div>
                     {% else %}
@@ -320,49 +340,6 @@
     </div>
 </div>
 
-<!-- Script para la cuenta atrás - SOLO RECARGA CUANDO OCURRE EL EVENTO -->
-{% if next_event %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const eventDate = new Date("{{ next_event.session_datetime.isoformat() }}").getTime();
-    let hasReloaded = false;
-    
-    function checkEventStart() {
-        const now = new Date().getTime();
-        const distance = eventDate - now;
-        
-        // Actualizar contador normalmente
-        if (distance > 0) {
-            const days = Math.floor(distance / (1000 * 60 * 60 * 24));
-            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-            
-            if (document.getElementById('countdown-days')) {
-                document.getElementById('countdown-days').textContent = days.toString().padStart(2, '0');
-                document.getElementById('countdown-hours').textContent = hours.toString().padStart(2, '0');
-                document.getElementById('countdown-minutes').textContent = minutes.toString().padStart(2, '0');
-                document.getElementById('countdown-seconds').textContent = seconds.toString().padStart(2, '0');
-            }
-        }
-        
-        // SOLO recargar cuando el evento empieza (distance <= 0) y no se ha recargado antes
-        if (distance <= 0 && !hasReloaded) {
-            console.log('🔄 Evento iniciado - recargando dashboard');
-            hasReloaded = true;
-            setTimeout(() => {
-                window.location.reload();
-            }, 1000);
-        }
-    }
-    
-    // Verificar cada segundo
-    setInterval(checkEventStart, 1000);
-    checkEventStart();
-});
-</script>
-{% endif %}
-
 <style>
 .countdown-container {
     background: linear-gradient(135deg, #f8f9fa, #e9ecef);
@@ -392,17 +369,6 @@ document.addEventListener('DOMContentLoaded', function() {
     color: #6c757d;
     text-transform: uppercase;
     font-weight: 600;
-}
-
-.live-button {
-    animation: pulse 2s infinite;
-    font-weight: bold;
-}
-
-@keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
 }
 
 .activity-item {
