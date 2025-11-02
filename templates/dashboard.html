@@ -78,9 +78,7 @@
                             {% set current_time = now.replace(tzinfo=None) %}
                             {% set seconds_to_session = (session_time - current_time).total_seconds() %}
                             
-                            {% if seconds_to_session <= 600 and seconds_to_session > 0 %}
-                            🔴 EN VIVO PRONTO
-                            {% elif seconds_to_session <= 0 and seconds_to_session > -7200 %}
+                            {% if seconds_to_session <= 0 and seconds_to_session > -7200 %}
                             🔴 EN DIRECTO
                             {% else %}
                             ⏰ Próximo Evento
@@ -105,11 +103,7 @@
                         {% set current_time = now.replace(tzinfo=None) %}
                         {% set seconds_to_session = (session_time - current_time).total_seconds() %}
                         
-                        {% if seconds_to_session <= 600 and seconds_to_session > 0 %}
-                        <div class="alert alert-warning py-1 mb-2">
-                            <small>🔴 <strong>En vivo en {{ (seconds_to_session / 60)|round(0, 'floor')|int }} min</strong></small>
-                        </div>
-                        {% elif seconds_to_session <= 0 and seconds_to_session > -7200 %}
+                        {% if seconds_to_session <= 0 and seconds_to_session > -7200 %}
                         <div class="alert alert-danger py-1 mb-2">
                             <small>🔴 <strong>¡EN VIVO AHORA!</strong></small>
                         </div>
@@ -152,14 +146,10 @@
                         {% endif %}
                         
                         <div class="event-actions">
-                            {% if seconds_to_session <= 600 and seconds_to_session > -7200 %}
+                            {% if seconds_to_session <= 0 and seconds_to_session > -7200 %}
                             <a href="{{ url_for('live_session', race_id=next_event.race_id, session_type=next_event.session_type) }}" 
                                class="btn btn-danger btn-sm w-100 mb-2 live-button">
-                               {% if seconds_to_session > 0 %}
-                               🔴 VER EN VIVO
-                               {% else %}
                                🔴 VER DIRECTO
-                               {% endif %}
                             </a>
                             {% elif seconds_to_session <= -7200 %}
                             <a href="{{ url_for('live_session', race_id=next_event.race_id, session_type=next_event.session_type) }}" 
@@ -330,40 +320,45 @@
     </div>
 </div>
 
-<!-- Script para la cuenta atrás -->
+<!-- Script para la cuenta atrás - SOLO RECARGA CUANDO OCURRE EL EVENTO -->
 {% if next_event %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const eventDate = new Date("{{ next_event.session_datetime.isoformat() }}").getTime();
+    let hasReloaded = false;
     
-    function updateCountdown() {
+    function checkEventStart() {
         const now = new Date().getTime();
         const distance = eventDate - now;
         
-        if (distance < 0) {
-            window.location.reload();
-            return;
+        // Actualizar contador normalmente
+        if (distance > 0) {
+            const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+            
+            if (document.getElementById('countdown-days')) {
+                document.getElementById('countdown-days').textContent = days.toString().padStart(2, '0');
+                document.getElementById('countdown-hours').textContent = hours.toString().padStart(2, '0');
+                document.getElementById('countdown-minutes').textContent = minutes.toString().padStart(2, '0');
+                document.getElementById('countdown-seconds').textContent = seconds.toString().padStart(2, '0');
+            }
         }
         
-        const days = Math.floor(distance / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-        
-        document.getElementById('countdown-days').textContent = days.toString().padStart(2, '0');
-        document.getElementById('countdown-hours').textContent = hours.toString().padStart(2, '0');
-        document.getElementById('countdown-minutes').textContent = minutes.toString().padStart(2, '0');
-        document.getElementById('countdown-seconds').textContent = seconds.toString().padStart(2, '0');
-        
-        if (distance <= 10 * 60 * 1000) {
+        // SOLO recargar cuando el evento empieza (distance <= 0) y no se ha recargado antes
+        if (distance <= 0 && !hasReloaded) {
+            console.log('🔄 Evento iniciado - recargando dashboard');
+            hasReloaded = true;
             setTimeout(() => {
                 window.location.reload();
             }, 1000);
         }
     }
     
-    updateCountdown();
-    setInterval(updateCountdown, 1000);
+    // Verificar cada segundo
+    setInterval(checkEventStart, 1000);
+    checkEventStart();
 });
 </script>
 {% endif %}
